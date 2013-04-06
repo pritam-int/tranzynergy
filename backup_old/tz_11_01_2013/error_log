@@ -1,0 +1,4 @@
+[02-Dec-2012 18:45:17] PHP Fatal error:  Exception thrown without a stack frame in Unknown on line 0
+[09-Dec-2012 07:00:31] PHP Fatal error:  Class 'SelectQueryExtender' not found in /home/tz/public_html/includes/pager.inc on line 665
+[16-Dec-2012 07:26:36] PHP Fatal error:  Class 'SelectQueryExtender' not found in /home/tz/public_html/includes/pager.inc on line 665
+[16-Dec-2012 22:19:25] PHP Fatal error:  Exception thrown without a stack frame in Unknown on line 0

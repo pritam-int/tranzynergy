@@ -1,0 +1,134 @@
+<?php
+    /***
+    * hook_init
+    ***/
+    function final_document_init() {
+      drupal_add_js(drupal_get_path('module', 'final_document') .'/js/final_document.js');
+      drupal_add_css(drupal_get_path('module', 'final_document') .'/css/final_document.css');
+    }
+    
+    /***
+    * hook_menu
+    ***/
+    function final_document_menu() {        
+      $items = array();
+      $items['add_final_documents/%'] = array(	    
+	//'page callback' => 'editor_final_document_ajax',
+	'page callback' => 'drupal_get_form',
+	'page arguments' => array('editor_final_document_ajax_form', 1),
+	'access arguments' => array('access final document upload'),
+	'access callback' => 'user_access',
+	'type' => MENU_CALLBACK,
+      );
+      
+      $items['add_final_documents_ajax/%'] = array(	    
+	'page callback' => 'editor_final_document_ajax',
+	'page arguments' => array('editor_final_document_ajax_form', 1),
+	'access arguments' => array('access final document upload'),
+	'access callback' => 'user_access',
+	'type' => MENU_CALLBACK,
+      );
+      
+      return $items;
+    }
+    
+    /**
+    * Implementation of hook_permission().
+    **/
+    function final_document_permission() {
+      // Restrict access to either of your new URLs.
+      return array(
+	'access final document upload' => array(
+	  'title' => t('access final document upload'),
+	  'description' => t('Allow users to access final document upload page'),
+	),
+      );
+    }
+    
+    function editor_final_document_ajax(){
+	$output = drupal_render(drupal_get_form('editor_final_document_ajax_form'));    
+	ctools_include('ajax');
+	ctools_include('modal');
+	$commands = array();
+	$commands[] = ctools_modal_command_display('Add Job Resources', $output);
+	print ajax_render($commands);
+    }
+    
+    function editor_final_document_ajax_form () {
+      $job_nid = arg(1); //Need to decrypt
+      $job_nid = trim(check_plain($job_nid));
+      $node = node_load($job_nid);
+      
+      $form = array();	
+      $form['final_document'] = array(
+	  '#type' => 'file',
+	  '#title' => t('Final Document'),
+	  '#size' => 30,
+      );
+      
+      $form['job_nid'] = array(
+	  '#type' => 'hidden',
+	  '#default_value' => $job_nid,
+      );
+      
+      $form['submit'] = array (
+	'#prefix' => '<div id="job_submit">',
+	'#type' => 'submit',
+	'#value' => 'Submit',
+	'#suffix' => '</div>'
+      );
+       
+      return $form;
+    }
+
+    function editor_final_document_ajax_form_validate($form, &$form_state) {      
+      if(count(form_get_errors())>0){
+	ctools_include('ajax');
+	ctools_include('modal');
+	$commands = array();		  
+	$commands[] = ajax_command_replace('#show_message_place_job_rec', '<div id="messages" class="grid-12">' . theme('status_messages') . '</div>');
+	print ajax_render($commands);
+	exit;
+      }
+    }
+
+    function editor_final_document_ajax_form_submit($form, &$form_state) {
+	$job_nid = decr(trim($form_state['values']['job_nid'])); //Need to decrypt
+	$job_nid = check_plain($job_nid);
+	$node = node_load($job_nid);
+	
+	node_object_prepare($node); //sets up all the default values
+	
+	//Save document
+	if ($file_doc = file_save_upload('final_document', $validators, "public://final_documents/")) {
+	  // Change status and display
+	  $file_doc->status = 1;
+	  $file_doc->display = 1;
+	  // save the file permanently
+	  file_save($file_doc);
+	}
+	
+	if(!empty($file_doc)) $node->field_final_document_customer['und'][] = (array)$file_doc;	
+	
+	node_save($node);
+	
+	
+	
+	//structure the notification message		  
+	$output = t("The final document @name has been uploaded successfully.", array(
+	    '@name' => $file_doc->filename,		      
+	  )
+	);
+	
+	drupal_set_message($output);	
+	ctools_include('ajax');
+	ctools_include('modal');
+
+	$commands = array();		  
+	$commands[] = ctools_modal_command_dismiss();		  
+	$commands[] = ajax_command_replace('#messages', '<div id="messages" class="grid-12">' . theme('status_messages') . '</div>');
+	
+	print ajax_render($commands);
+	exit;	
+    }
+    

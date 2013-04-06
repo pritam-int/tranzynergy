@@ -1,0 +1,23 @@
+#quicktabs-user_dashboard .quicktabs-tabs li:nth-child(2) {
+    display:none;
+}
+
+.executive_user #quicktabs-user_dashboard .quicktabs-tabs li:nth-child(2) {
+    display:block;
+}
+
+#search-my-job-form .form-item-recv-date-date label[for=edit-recv-date-datepicker-popup-0] {
+    display:none;
+}
+
+#block-user-dashboard-dashboard-myjobs #search-my-job-form {
+    display:none;
+}
+
+.search_my_job_link {
+    cursor:pointer;
+}
+
+.stricken_job {
+    text-decoration: line-through;
+}

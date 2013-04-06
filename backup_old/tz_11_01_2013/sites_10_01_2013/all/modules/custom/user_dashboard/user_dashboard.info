@@ -1,0 +1,6 @@
+; $Id$
+name = User Dashboard
+description = This module has been developed to display the user dashboard
+core = 7.x
+package = Custom Module
+version = 7.0.1

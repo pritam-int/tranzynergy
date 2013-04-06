@@ -1,0 +1,822 @@
+<?php
+  /***
+  * hook_init
+  ***/
+  function user_dashboard_init() {
+    drupal_add_js(drupal_get_path('module', 'user_dashboard') .'/js/user_dashboard.js');
+    drupal_add_css(drupal_get_path('module', 'user_dashboard') .'/css/user_dashboard.css');    
+  }
+
+  /***
+  * hook_menu
+  ***/
+  function user_dashboard_menu() {
+    $items = array();            
+    $items['search_my_job'] = array(		
+	'title' => 'My Jobs',
+	'page callback' => 'user_dashboard_my_job_search',
+	'access arguments' => array('access user dashboard'),
+	'type' => MENU_CALLBACK,
+    );
+    
+    $items['user_dashboard/callback/changestatus'] = array(
+	'page callback' => 'set_job_status',
+	'access arguments' => array('access content'),
+	'type' => MENU_CALLBACK,
+    );
+    
+    return $items;
+  }
+  
+  /**
+  ** Implementation of hook_permission().
+  **/
+  function user_dashboard_permission() {
+    // Restrict access to either of your new URLs.
+    return array(
+      'access user dashboard' => array(
+	'title' => t('access user dashboard'),
+	'description' => t('Allow users to access access user dashboard'),
+      ),
+    );
+  }
+  
+  /****
+  ** hook_block_info()
+  ****/
+  function user_dashboard_block_info() {
+    $blocks['dashboard_myjobs'] = array(
+      'info' => t('My Jobs'),
+    );
+    
+    $blocks['executive_dashboard'] = array(
+      'info' => t('Executive Dashboard'),
+    );
+    
+    $blocks['dashboard_editor'] = array(
+      'info' => t('My Editing Job Dashboard'),
+    );
+    
+    $blocks['dashboard_translator'] = array(
+      'info' => t('My Translating Job Dashboard'),
+    );
+    
+    $blocks['dashboard_my_invoice'] = array(
+      'info' => t('My Invoice'),
+    );
+    
+    return $blocks;
+  }
+  
+  /****
+  ** hook_block_view()
+  ****/
+  function user_dashboard_block_view($delta) {
+    $blocks = array();
+    //delta is your block name. then just set it equal to your return functions.
+    switch ($delta) {
+      case 'dashboard_myjobs':
+	$blocks['subject'] = 'My Jobs';
+	$blocks['content'] = user_dashboard_my_job();
+	break;
+      
+      case 'executive_dashboard':
+	$blocks['subject'] = 'Executive Dashboard';
+	$blocks['content'] = executive_user_dashboard();
+	break;
+      
+      case 'dashboard_editor':
+	$blocks['subject'] = 'My Editing Jobs';
+	$blocks['content'] = user_dashboard_editing();
+	break;
+   
+      case 'dashboard_translator':
+	$blocks['subject'] = 'My Translating Jobs';
+	$blocks['content'] = user_dashboard_translating();
+	break;
+      
+      case 'dashboard_my_invoice':
+	$blocks['subject'] = 'My Invoice';
+	$blocks['content'] = user_dashboard_my_invoice();
+	break;
+      
+    }
+    return $blocks;
+  }
+  
+  /***
+  * function to 
+  ***/
+  function executive_user_dashboard() {
+    GLOBAL $user;
+    $user_role = $user->roles;
+    
+    $excutive_role_id = 12;
+    if(array_key_exists($excutive_role_id, $user_role)) {
+      $job_type = "executive_jobs";
+      $term_id = '';
+      return dashboar_common($job_type, $term_id);
+      
+    } else {
+      return '';
+    }
+  }
+  
+  /***
+  * function to 
+  ***/
+  function user_dashboard_my_job() {
+    $job_type = "my_job";
+    $term_id = '';
+    return dashboar_common($job_type, $term_id);
+  }
+  
+  /***
+  * function to 
+  ***/
+  function user_dashboard_editing() {
+    $term_id = 4;
+    $job_type = "editing_job";
+    return dashboar_common($job_type, $term_id);
+  }
+  
+  /***
+  * function to 
+  ***/
+  function user_dashboard_translating() {
+    $term_id = 3;
+    $job_type = "translating_job";
+    return dashboar_common($job_type, $term_id);
+  }
+  
+  /***
+  * function to search my jobs
+  ***/
+  function user_dashboard_my_job_search() {
+    $job_type = "my_job_search";
+    $term_id = '';
+    return dashboar_common($job_type, $term_id, $_POST);
+  }
+  
+  /****
+  ** Dashboar Common Function
+  ****/
+  function dashboar_common($my_job_type, $term_id, $search_data = array()) {
+    ctools_include('modal');
+    ctools_include('ajax');
+    ctools_modal_add_js();
+    
+    $file_path = drupal_get_path('module', 'user_dashboard') .'/inc/the_table.php';
+    include($file_path);
+    $contents = $content_1 = '';
+    
+    GLOBAL $user;
+    $uid = $user->uid;
+    $user_name = $user->name;
+    $user_mail = $user->mail;
+    
+    switch($my_job_type) {
+      case 'my_job':
+	$query = "SELECT node.nid AS nid, node.created AS node_created
+	      FROM 
+	    {node} node
+	    LEFT JOIN {users} users_node ON node.uid = users_node.uid
+	    WHERE (( (node.status = '1') AND (node.type IN  ('job')) AND( (users_node.uid = '$uid') )))
+	    GROUP BY nid ORDER BY node_created DESC";
+	break;
+    
+      case 'executive_jobs':
+	$query = "SELECT node.nid AS nid, node.created AS node_created
+	      FROM
+	    {node} node
+	    LEFT JOIN {users} users_node ON node.uid = users_node.uid
+	    WHERE (( (node.status = '1') AND (node.type IN  ('job')) ))
+	    ORDER BY node_created DESC";
+      break;
+    
+      case 'editing_job':
+      case 'translating_job':
+	  $query = "SELECT node.nid AS nid, node.created AS node_created
+	      FROM 
+	    {node} node
+	    WHERE (( (node.status = '1') AND (node.type IN  ('job')) ))
+	    ORDER BY node_created DESC";
+	  break;
+	
+      case 'my_job_search':    
+	$query = "SELECT node.nid AS nid, node.created AS node_created
+	      FROM 
+	    {node} node
+	    LEFT JOIN {users} users_node ON node.uid = users_node.uid
+	    WHERE (( (node.status = '1') AND (node.type IN  ('job')) AND( (users_node.uid = '$uid') )))
+	    GROUP BY nid ORDER BY node_created DESC";
+	break;
+    }
+    
+    $result = returnArrayOfObject($query);
+    
+    //echo "Job Type : ".$my_job_type;
+    //echo "<br/> result ";
+    //pre_disp($result);
+    
+    //Jobs
+    if(count($result) > 0) {
+	foreach($result AS $values) {
+	  $job_node = array();
+	  $job_node = node_load($values->nid);
+	  
+	  $job_nid = $job_node->nid;	
+	  //$job_title = l($job_node->title, 'node/'.$job_nid);
+	  if($my_job_type == "my_job")
+	  	$job_title = l($job_node->title, 'edit_job/'.$job_nid);
+	  else 
+	  	$job_title = $job_node->title;
+	  $customer_nid = $job_node->field_customer['und'][0]['nid'];
+	  $customer_node = node_load($customer_nid);
+	  $customer_title = l($customer_node->title, 'node/'.$customer_node->nid);
+	  
+	  $po_number  = trim($job_node->field_po_number['und'][0]['value']) == "" ? "N/A" : $job_node->field_po_number['und'][0]['value'];
+	  $project_nid = $job_node->field_project_name['und'][0]['nid'];
+	  
+	  $field_job_status = $job_node->field_job_status['und'][0]['value'];
+	  
+	  switch($field_job_status){
+	    case 1 :
+	      $job_status = 'Translating';
+	      break;
+	    
+	    case 2 :
+	      $job_status = 'Editing';
+	      break;
+	    
+	    case 3 :
+	      $job_status = 'Pending';
+	      break;
+	    
+	    case 4 :
+	      $job_status = 'Completed';
+	      break;
+	    
+	    case 5 :
+	      $job_status = 'Invoiced';
+	      break;
+	    
+	    case 6 :
+	      $job_status = 'Payment Received';
+	      break;
+	    
+	    case 7 :
+	      $job_status = 'Closed';
+	      break;
+	    
+	    default:
+	      $job_status = '';
+	  }
+	  
+	  $project_mngr = l($user_name, 'mailto:'.$user_mail);
+	  $field_date_due = $job_node->field_date_due['und'][0]['value'];
+	  $field_date_due = $job_node->field_date_due['und'][0]['value'];
+
+	  $due_date_exp = explode(" ",$field_date_due);
+	  $due_date_exp1 = explode("-",$due_date_exp[0]);
+	  
+	  $field_date_due  = date('y-m-d', mktime(0, 0, 0, $due_date_exp1[1], $due_date_exp1[2], $due_date_exp1[0]));
+	  
+	  $result_jr = array();
+	  $query_jr = '';
+	  
+	  switch($my_job_type) {
+	      case 'my_job':
+		$query_jr = "SELECT node.title AS node_title, node.nid AS nid
+		      FROM 
+		      {node} node
+		      LEFT JOIN {field_data_field_job_assigned} field_data_field_job_assigned ON node.nid = field_data_field_job_assigned.entity_id AND (field_data_field_job_assigned.entity_type = 'node' AND field_data_field_job_assigned.deleted = '0')
+		      WHERE (( (node.status = '1') AND (node.type IN  ('job_resource')) AND (field_data_field_job_assigned.field_job_assigned_nid IN  ('$job_nid')) ))
+		      ORDER BY node_title ASC";
+		      
+		$edit_job_link = '<td class="views-field views-field-field-job-id"><span class="s_link"><a href="'.base_path().'edit_job/'.$job_nid.'" target="_blank"> Edit </a></span></td>';
+		break;
+	    
+	      case 'executive_jobs':
+		$query_jr = "SELECT node.title AS node_title, node.nid AS nid
+		      FROM 
+		      {node} node
+		      LEFT JOIN {field_data_field_job_assigned} field_data_field_job_assigned ON node.nid = field_data_field_job_assigned.entity_id AND (field_data_field_job_assigned.entity_type = 'node' AND field_data_field_job_assigned.deleted = '0')
+		      WHERE (( (node.status = '1') AND (node.type IN  ('job_resource')) AND (field_data_field_job_assigned.field_job_assigned_nid IN  ('$job_nid')) ))
+		      ORDER BY node_title ASC";
+		      
+		$path = 'add_final_documents_ajax/'.enc($job_nid);
+		$img_path = drupal_get_path('module', 'user_dashboard') .'/images/upload.png';
+		$img = '<img src="'.$img_path.'" />';
+		
+		$edit_job_link = '<td class="views-field views-field-field-job-id"><span class="s_link"><a href="'.base_path().'edit_job/'.$job_nid.'" target="_blank"> Edit </a></span></td>';
+		
+		$final_document_link = '<td class="views-field views-field-create-payment">'.ctools_modal_text_button( $img, $path, t('Upload Final Document'), 'ctools-modal-my-modal-style').'</td>';
+		break;
+	    
+	      case 'editing_job':
+	      case 'translating_job':
+		  $query_jr = "SELECT node.title AS node_title, node.nid AS nid
+			FROM 
+			{node} node
+			LEFT JOIN {field_data_field_member} field_data_field_member ON node.nid = field_data_field_member.entity_id AND (field_data_field_member.entity_type = 'node' AND field_data_field_member.deleted = '0')
+			LEFT JOIN {field_data_field_job_assigned} field_data_field_job_assigned ON node.nid = field_data_field_job_assigned.entity_id AND (field_data_field_job_assigned.entity_type = 'node' AND field_data_field_job_assigned.deleted = '0')
+			INNER JOIN {field_data_field_job_type} field_data_field_job_type ON node.nid = field_data_field_job_type.entity_id AND (field_data_field_job_type.entity_type = 'node' AND field_data_field_job_type.deleted = '0')
+			WHERE (( (node.status = '1') AND (node.type IN  ('job_resource')) AND (field_data_field_member.field_member_uid IN  ('$uid')) AND (field_data_field_job_assigned.field_job_assigned_nid IN  ('$job_nid')) AND (field_data_field_job_type.field_job_type_tid = '$term_id') ))
+			ORDER BY node_title ASC";
+		  break;
+		
+		case 'my_job_search':		  
+		  $query_jr = "SELECT node.title AS node_title, node.nid AS nid
+		      FROM 
+		      {node} node
+		      LEFT JOIN {field_data_field_job_assigned} field_data_field_job_assigned ON node.nid = field_data_field_job_assigned.entity_id AND (field_data_field_job_assigned.entity_type = 'node' AND field_data_field_job_assigned.deleted = '0')
+		      WHERE (( (node.status = '1') AND (node.type IN  ('job_resource')) AND (field_data_field_job_assigned.field_job_assigned_nid IN  ('$job_nid')) ))
+		      ORDER BY node_title ASC";
+		  $edit_job_link = '<td class="views-field views-field-field-job-id"><span class="s_link"><a href="'.base_path().'edit_job/'.$job_nid.'" target="_blank"> Edit </a></span></td>';
+		  break;
+	  }
+	  
+	  $result_jr = returnArrayOfObject($query_jr);
+	  
+	  $encrypted_job_nid = enc($job_nid);
+	  $encrypted_jr_nid = enc($jr_node->nid);
+	  
+	  // For invoice
+	  $query = "SELECT node.created AS node_created, node.nid AS nid
+		    FROM 
+		    {node} node
+		    LEFT JOIN {field_data_field_job} field_data_field_job ON node.nid = field_data_field_job.entity_id AND (field_data_field_job.entity_type = 'node' AND field_data_field_job.deleted = '0')
+		    WHERE (( (node.status = '1') AND (node.type IN  ('invoice')) AND (field_data_field_job.field_job_nid IN  ('$job_nid')) ))
+		    ORDER BY node_created DESC";
+	  $result_invoice_for_job = returnArrayOfObject($query);
+	  
+	  $invoice_td = '';
+	  /*********************Commented as per request by the Client on 7Dec*********************/
+	  if(count($result_invoice_for_job) == 0) {		  
+	      /*$invoice = l('Create Invoice', 'create_invoice/'.$encrypted_job_nid);		  
+	      $invoice_td = '<td class="views-field views-field-php">'.$invoice.'</td>';*/
+	      $invoice = '';		  
+	      $invoice_td = '<td class="views-field views-field-php">'.$invoice.'</td>';
+	      $disabled = "";
+	      
+	  } else {
+	      //Invoice Created
+		$options['attributes'] = array( 'target' => '_blank' );
+	      $invoiceArr = node_load($result_invoice_for_job[0]->nid);
+	      $invoice = l('Download Invoice', 'sites/default/files/invoices/'.$invoiceArr->field_pdf_invoice_name['und'][0]['value'], $options);	
+	      //$invoice = '<span class="invoice_created">Invoice Created</span>';
+	      $invoice_td = '<td class="views-field views-field-php">'.$invoice.'</td>';
+	      $disabled = "disabled='disabled'";
+	  }
+	  // End of for Invoice
+	  
+	  
+	  $job_resource_table = '';
+	  
+	  if(count($result_jr) > 0) {
+	      $job_resource_table .= '<table class="job_resource_table">';
+	      $job_resource_table_T = $job_resource_table_E = $job_resource_table_F = $job_resource_table_PR = $job_resource_table_PM = '';
+	      //Job Resources
+	      foreach($result_jr AS $jr_values) {
+		$jr_nid = $jr_values->nid;
+		$jr_node = node_load($jr_nid);
+		
+		$rs_title = $jr_node->title;
+		$field_rate = $jr_node->field_rate['und'][0]['value'];	      
+		$field_count = $jr_node->field_count['und'][0]['value'];
+		
+		$total_amount = $field_rate * $field_count;
+		$total = '$'.number_format($total_amount,2,'.','');
+		
+		$field_rate = '$'.number_format($field_rate,2,'.','');
+		
+		$field_job_type_tid = $jr_node->field_job_type['und'][0]['tid'];
+		switch($field_job_type_tid) {		  
+		  case 3 :
+		    $job_type = 'T'; //Translation
+		    break;
+		  
+		  case 4 :
+		    $job_type = 'E'; //Editor
+		    break;
+		  
+		  case 5 :
+		    $job_type = 'F'; //Finder
+		    break;
+		  
+		  case 6 :
+		    $job_type = 'PR'; //Proofreader
+		    break;
+		  
+		  case 7 :
+		    $job_type = 'PM'; //Project Manager
+		    break;
+		  
+		  default:
+		    $job_type = '';
+		}
+		
+		$field_member = $jr_node->field_member['und'][0]['uid'];
+		$member_user = user_load($field_member);
+		$member_mail = $member_user->mail;
+		
+		$job_assigned_to = '';
+		if($my_job_type == 'my_job' || $my_job_type == 'my_job_search' || $my_job_type == 'executive_jobs') {
+		  $job_assigned_to = '<td class="views-field views-field-php-3">'.l($member_user->name, 'mailto:'.$member_mail).'</td>';		  
+		}
+		
+		/** For invoice link **/
+		$query = "SELECT node.created AS node_created, node.nid AS nid
+			    FROM 
+			    {node} node
+			    LEFT JOIN {field_data_field_job} field_data_field_job ON node.nid = field_data_field_job.entity_id AND (field_data_field_job.entity_type = 'node' AND field_data_field_job.deleted = '0')
+			    LEFT JOIN {field_data_field_for_the_user} field_data_field_for_the_user ON node.nid = field_data_field_for_the_user.entity_id AND (field_data_field_for_the_user.entity_type = 'node' AND field_data_field_for_the_user.deleted = '0')
+			    WHERE (( (node.status = '1') AND (node.type IN  ('invoice')) AND (field_data_field_job.field_job_nid IN  ('$job_nid')) AND (field_data_field_for_the_user.field_for_the_user_uid IN  ('$field_member')) ))
+			    ORDER BY node_created DESC";
+		$result_invoice = returnArrayOfObject($query);
+		
+		$create_payment_link = '';
+		    
+		if(empty($result_invoice)) {		  
+		    if($my_job_type == 'executive_jobs') {
+			//Create payment link only for the Executive users		      
+			$create_payment = '<span class="invoice-not-created">Invoice not created</span>';
+			$create_payment_link = '<td class="views-field views-field-create-payment">'.$create_payment.'</td>';
+		    }
+		    
+		} else {
+		    $invoice_id = $result_invoice[0]->nid;
+		    $encrypted_invoice_nid = enc($invoice_id);
+		    
+		    if($my_job_type == 'executive_jobs') {
+			$query = "SELECT node.nid AS nid, node.created AS node_created
+			  FROM 
+			  {node} node
+			  LEFT JOIN {field_data_field_invoice} field_data_field_invoice ON node.nid = field_data_field_invoice.entity_id AND (field_data_field_invoice.entity_type = 'node' AND field_data_field_invoice.deleted = '0')
+			  WHERE (( (node.status = '1') AND (node.type IN  ('payment')) AND (field_data_field_invoice.field_invoice_nid IN  ('$invoice_id')) ))";
+			  $result_payment_invoice = returnArrayOfObject($query);
+			
+			if(!empty($result_payment_invoice)) {
+			  $payment_id = $result_payment_invoice[0]->nid;
+			  $create_payment = l('View Payment', 'node/'.$payment_id);
+			  
+			} else {
+			  //Create payment link only for the Executive users
+			  $create_payment = l('Create Payment', 'create_payment/'.$encrypted_invoice_nid);
+			}		      
+			$create_payment_link = '<td class="views-field views-field-create-payment">'.$create_payment.'</td>';
+		    }
+		}
+		
+		  switch($field_job_type_tid) {		  
+		    case 3 :
+		      //Translation		      
+		      $job_resource_table_T .= '<tr>
+				  <td class="views-field views-field-translator">'.$job_type.'</td>
+				  '.$job_assigned_to.'
+				  <td class="views-field views-field-field-date-due">'.$field_date_due.'</td>
+			     <!-- <td class="views-field views-field-field-job-status">'.$job_status.'</td> --> <!-- Updated on 15 Jan -->
+				  <td class="views-field views-field-field-rate">'.$field_rate.'</td>
+				  <td class="views-field views-field-field-count">'.$field_count.'</td>
+				  <td class="views-field views-field-php-1">'.$total.'</td>
+			  </tr>';
+		      break;
+		    
+		    case 4 :
+		      //Editor
+		      $job_resource_table_E .= '<tr>
+				  <td class="views-field views-field-translator">'.$job_type.'</td>
+				  '.$job_assigned_to.'
+				  <td class="views-field views-field-field-date-due">'.$field_date_due.'</td>
+			      <!--<td class="views-field views-field-field-job-status">'.$job_status.'</td>  --> <!-- Updated on 15 Jan -->
+				  <td class="views-field views-field-field-rate">'.$field_rate.'</td>
+				  <td class="views-field views-field-field-count">'.$field_count.'</td>
+				  <td class="views-field views-field-php-1">'.$total.'</td>
+			  </tr>';
+		      break;
+		    
+		    case 5 :
+		      //Finder
+		      $job_resource_table_F .= '<tr>
+				  <td class="views-field views-field-translator">'.$job_type.'</td>
+				  '.$job_assigned_to.'
+				  <td class="views-field views-field-field-date-due">'.$field_date_due.'</td>
+			      <!--<td class="views-field views-field-field-job-status">'.$job_status.'</td>  --> <!-- Updated on 15 Jan -->
+				  <td class="views-field views-field-field-rate">'.$field_rate.'</td>
+				  <td class="views-field views-field-field-count">'.$field_count.'</td>
+				  <td class="views-field views-field-php-1">'.$total.'</td>
+			  </tr>';
+		      break;
+		    
+		    case 6 :
+		      //Proofreader
+		      $job_resource_table_PR .= '<tr>
+		     
+				  <td class="views-field views-field-translator">'.$job_type.'</td>
+				  '.$job_assigned_to.'
+				  <td class="views-field views-field-field-date-due">'.$field_date_due.'</td>
+			      <!--<td class="views-field views-field-field-job-status">'.$job_status.'</td>  --> <!-- Updated on 15 Jan -->
+				  <td class="views-field views-field-field-rate">'.$field_rate.'</td>
+				  <td class="views-field views-field-field-count">'.$field_count.'</td>
+				  <td class="views-field views-field-php-1">'.$total.'</td>
+			  </tr>';
+		      break;
+		    
+		    case 7 :
+		      //Project Manager
+		      $job_resource_table_PM .= '<tr>
+				  <td class="views-field views-field-translator">'.$job_type.'</td>
+				  '.$job_assigned_to.'
+				  <td class="views-field views-field-field-date-due">'.$field_date_due.'</td>
+			      <!--<td class="views-field views-field-field-job-status">'.$job_status.'</td>  --> <!-- Updated on 15 Jan -->
+				  <td class="views-field views-field-field-rate">'.$field_rate.'</td>
+				  <td class="views-field views-field-field-count">'.$field_count.'</td>
+				  <td class="views-field views-field-php-1">'.$total.'</td>
+			  </tr>';
+		      break;
+		  }
+		
+	      }
+	      
+	      $job_resource_table .= $job_resource_table_T.$job_resource_table_E.$job_resource_table_F.$job_resource_table_PR.$job_resource_table_PM;
+	      
+	      $job_resource_table .= '</table>';
+	      
+	  } // Job Resource counter's if condition "job resource"
+	  $invoice_link = "";
+	  if($my_job_type == "my_job")
+     {
+		
+			$invoice_link .=  '<td class="views-field views-field-title"><input type="checkbox" '.$disabled.' name="checked_job_nid" value="'.$job_nid.'-'.$customer_nid.'" /></td>';        
+	  }	
+	  
+	  if(count($result_jr) > 0) {
+	  $job_status_list = job_status_list($job_nid, $field_job_status);    
+	  $content_1 .= '<tr>
+	  			'.$invoice_link.'
+			  <td class="views-field views-field-title">'.$job_title.'</td>
+			  <td class="views-field views-field-title">'.$po_number.'</td>
+			  <td class="views-field views-field-field-customer">'.$customer_title.'</td>
+			  <td class="views-field views-field-jobstatus"><span id="span_status_label_'.$job_nid.'" onclick="return open_status_list('.$job_nid.');" class="span_status_label" title="Click here to edit">'.$job_status.'</span><span class="span_status_select" id="span_status_select_'.$job_nid.'" >'.$job_status_list.'</span></td> <!-- Updated on 15 Jan -->
+			  <td class="views-field views-field-name">'.$project_mngr.'</td>
+			  
+			  <td class="views-field views-jor-resource">'.$job_resource_table.'</td>
+			  
+			  '.$invoice_td.'
+			  '.$create_payment_link.'
+			  '.$final_document_link.'
+			</tr>';
+	  }
+	  
+	}
+  
+    } // Job counter if conditions
+    
+    $contents = $content_table.$content_table_links.$content_table_01.$content_1.$content_table_2;
+    return $contents;
+  }
+  
+  /**
+   ** Job Status List Save
+   **
+  **/
+  function set_job_status()
+  {
+    $job_id = $_POST['job_id'];
+    $job_status_id = $_POST['job_status_id'];
+    
+    $job_node = node_load($job_id);
+    $job_node->field_job_status['und'][0]['value'] = $job_status_id;
+    
+    node_save($job_node);
+    
+    $return = array(
+		    'status' => '1',
+		  );
+    drupal_json_output($return);
+    
+  }
+  /**
+   ** Job Status List Creation
+   **
+  **/
+  function job_status_list($id,$field_job_status = "")
+  {
+     $job_status_arr = job_status();
+     
+     $select_start = "<select id='status_select_$id' class='status_list' onblur='return close_status_list($id);' onchange='return save_status_list($id);' >";
+     $option = "";
+     foreach($job_status_arr as $key=>$val)
+     {
+	if($key == $field_job_status)
+	  $selected = "selected='selected'";
+	else
+	  $selected = "";
+	  
+	$option .= "<option value='$key' $selected>$val</option>";
+     }
+     
+     
+     $select_end = "</select>";
+     
+     $select = $select_start.$option.$select_end;
+     
+     return $select;
+  }
+  
+  /***
+  ** Search Form 
+  ***/
+  
+  function search_my_job_form() {
+    $form = array();
+    $form['job'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Job Name'),
+    );
+    
+    $form['project'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Project Title'),
+    );
+    
+    $form['customer'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Customer Name'),
+    );
+    
+    $form['recv_date'] = array(
+      '#type' => 'date_popup',
+      '#date_timezone' => date_default_timezone(),
+      '#date_format' => 'Y-m-d',
+      '#date_year_range' => '-3:+3',
+      '#title' => t('Receive Date'),
+      '#default_value' => '',
+    );
+    
+    $form['job_status'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Job Status'),
+    );
+    
+    $form['#action'] = url('search_my_job');
+    
+    $form['submit'] = array (
+	'#prefix' => '<div id="search_submit">',
+	'#type' => 'submit',
+	'#value' => 'Search',
+	'#suffix' => '</div>'
+    );
+    
+    return $form;
+  }
+
+  /****
+  ** My Invoice
+  ***/
+  function user_dashboard_my_invoice() {
+    GLOBAL $user;
+    $uid = $user->uid;
+    
+    $file_path = drupal_get_path('module', 'user_dashboard') .'/inc/my_invoice_header.php';
+    include($file_path);
+    $contents = $content_1 = '';
+    
+    $query = "SELECT node.nid AS nid, node.created AS node_created
+	      FROM 
+	      {node} node
+	      LEFT JOIN {users} users_node ON node.uid = users_node.uid
+	      WHERE (( (node.status = '1') AND (node.type IN  ('bdi')) AND (node.uid IN  ('$uid')) ))
+	      ORDER BY node_created DESC";
+    $result = returnArrayOfObject($query);
+    
+    //pre_disp($result);
+    if(count($result)) {
+	foreach($result AS $data) {
+	  $bdi_nid = $data->nid;
+	  $node_bdi =  node_load($bdi_nid);
+	  
+	  //pre_disp($node_bdi);
+	  
+	  $invoice_no = 'TZ_'.$node_bdi->field_invoice_no['und'][0]['value'];
+	  $project_manager = $node_bdi->field_project_manager['und'][0]['value'];
+	  
+	  $customer_id = $node_bdi->field_customer_name['und'][0]['value'];
+	  $node_customer = node_load($customer_id);
+	  $customer_name = $node_customer->title;
+	  
+	  //Invoiced date
+	  $invoiced_date = $node_bdi->field_invoice_date['und'][0]['value'];
+	  $invoiced_date_temp = explode(' ', $invoiced_date);
+	  $invoiced_on_date = $invoiced_date_temp[0];
+	  
+	  //payment due date
+	  $invoiced_due_date = $node_bdi->field_invoice_due_date['und'][0]['value'];
+	  $invoiced_due_date_temp = explode(' ', $invoiced_due_date);
+	  $payment_due_date = $invoiced_due_date_temp[0];
+	  
+	  //Invoice Status
+	  $invoice_status_id = $node_bdi->field_invoice_status['und'][0]['value'];	  
+	  $invoice_status_array = invoice_status_dashboard();
+	  $invoice_status = $invoice_status_array[$invoice_status_id];
+	  //stricken through for voided job
+	  $stricken_class = 'not_stricken_job';
+	  if($invoice_status_id == 4) {
+	    $stricken_class = 'stricken_job';
+	  }
+	  
+	  $link = 'edit_generated_invoice/'.$bdi_nid;
+	  $edit_link = l('edit', $link, array('attributes' => array('target'=>'_blank')));
+	  
+	  $query = "SELECT node.nid AS nid, node.created AS node_created
+		    FROM 
+		    {node} node
+		    LEFT JOIN {field_data_field_invoice_id} field_data_field_invoice_id ON node.nid = field_data_field_invoice_id.entity_id AND (field_data_field_invoice_id.entity_type = 'node' AND field_data_field_invoice_id.deleted = '0')
+		    WHERE (( (node.status = '1') AND (node.type IN  ('invoice_job_resource')) AND (field_data_field_invoice_id.field_invoice_id_nid IN  ('$bdi_nid')) ))
+		    ORDER BY node_created DESC";
+	  $result_ijr = returnArrayOfObject($query);
+	  //pre_disp($node_invoice_job_resource);
+	  $invoice_total = $allocation_amount = 0;
+	  if(!empty($result_ijr)) {
+	    foreach($result_ijr AS $values) {
+	      $ijr_nid = $values->nid;
+	      $node_invoice_job_resource = node_load($ijr_nid);
+	      //pre_disp($node_invoice_job_resource);
+	      $resource_total = $node_invoice_job_resource->field_resource_total['und'][0]['value'];
+	      
+	      if(!empty($resource_total)) {
+		$invoice_total += $resource_total;
+	      }
+	      
+	    }
+	    
+	    $allocation_amount = number_format($invoice_total,2,'.','');
+	  }
+	  
+	  $query = "SELECT node.nid AS nid, node.created AS node_created
+		    FROM 
+		    {node} node
+		    LEFT JOIN {field_data_field_for_bill_to} field_data_field_for_bill_to ON node.nid = field_data_field_for_bill_to.entity_id AND (field_data_field_for_bill_to.entity_type = 'node' AND field_data_field_for_bill_to.deleted = '0')
+		    WHERE (( (node.status = '1') AND (node.type IN  ('job_details_for_invoice')) AND (field_data_field_for_bill_to.field_for_bill_to_nid IN  ('$bdi_nid')) ))
+		    ORDER BY node_created DESC";
+	  $result_job = returnArrayOfObject($query);    
+	  //pre_disp($result_job);
+	  
+	  $jdi_total_value = 0;
+	  if(count($result_job)) {
+	    $job_table .= '<table class="job_resource_table">';	    
+	    foreach($result_job AS $job_details_for_invoice) {
+	      $job_details_for_invoice_nid = $job_details_for_invoice->nid;
+	      $node_job_details_for_invoice = node_load($job_details_for_invoice_nid);
+	      
+	      //pre_disp($node_job_details_for_invoice);
+	      
+	      $job_name = $node_job_details_for_invoice->title;
+	      $po_number = $node_job_details_for_invoice->field_po_number['und'][0]['value'];
+	      
+	      $total_jdi = $node_job_details_for_invoice->field_total['und'][0]['value'];
+	      $jdi_total_value += $total_jdi;
+	      
+	      $job_table .= '<tr>
+				<td class="views-field views-field-job-name">'.$job_name.'</td>
+				<td class="views-field views-field-field-po-number">'.$po_number.'</td>
+			    </tr>';
+	    }
+	    
+	    $job_table .= '</table>';
+	  }
+	
+	  //$jdi_total_value -= ($jdi_total_value * .05);
+	  $jdi_total_value = number_format(round($jdi_total_value,2),2);
+	  $content_1 .= '<tr class='.$stricken_class.'>
+			  <td class="views-field views-field-invoice-number">'.$invoice_no.'</td>
+			  <td class="views-field views-jobs">'.$job_table.'</td>
+			  <td class="views-field views-field-pm">'.$project_manager.'</td>
+			  <td class="views-field views-field-cn">'.$customer_name.'</td>
+			  <td class="views-field views-field-field-invoice-date">'.$invoiced_on_date.'</td>
+			  <td class="views-field views-field-payment-due-date">'.$payment_due_date.'</td>
+			  <td class="views-field views-field-invoice-status">'.$invoice_status.'</td>
+			  <td class="views-field views-field-allocation-amount">'.$allocation_amount.'</td>
+			  <td class="views-field views-field-payment-due-date">'.$jdi_total_value.'</td>
+			  <td class="views-field views-field-payment-due-date">'.$edit_link.'</td>
+			</tr>';
+	
+	}
+    }
+    
+    $contents = $content_table.$content_table_01.$content_1.$content_table_2;
+    return $contents;
+  }
+  
+  
+  
+  function invoice_status_dashboard() {
+    $options[''] = 'Select';
+    $options[1] = 'Sent';
+    $options[2] = 'Pending';
+    $options[3] = 'Paid';
+    $options[4] = 'Voided';
+    $options[5] = 'Not Yet Sent';
+    return $options;
+  }

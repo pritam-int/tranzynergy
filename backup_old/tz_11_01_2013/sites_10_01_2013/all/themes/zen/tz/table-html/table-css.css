@@ -1,0 +1,44 @@
+@charset "utf-8";
+/* CSS Document */
+
+
+*{
+	margin:0;
+	padding:0;
+}
+
+body{
+	background:url(images/bg-full.jpg) 50% 0 no-repeat;	
+    color: #7A7A7A;
+    font: 14px/18px Verdana,Geneva,sans-serif;
+}
+
+.wrapper{
+	width:960px;
+	margin:196px auto 0;
+}
+
+.wrapper table{
+    border-left: 1px solid #E2E2E2;
+    border-top: 1px solid #E2E2E2;	
+}
+.wrapper td {
+    background: none repeat scroll 0 0 #FFFFFF;
+    border-bottom: 1px solid #E2E2E2;
+    border-right: 1px solid #E2E2E2;
+    color: #525252;
+    font: 12px/14px Arial,Helvetica,sans-serif;
+    padding: 8px;
+}
+.wrapper tr.title1 td{
+    background:#447017;
+    color: #FFFFFF;
+    font: bold 12px/14px Arial,Helvetica,sans-serif;
+    border-right: 1px solid #E2E2E2;
+}
+.wrapper tr.title2 td{
+    background:#6db226;
+    color: #FFFFFF;
+    font: bold 12px/14px Arial,Helvetica,sans-serif;
+    border-right: 1px solid #E2E2E2;
+}

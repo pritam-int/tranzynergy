@@ -1,0 +1,334 @@
+<?php
+    /***
+    * hook_init
+    ***/
+    function create_payment_init() {
+      drupal_add_js(drupal_get_path('module', 'create_payment') .'/js/create_payment.js');
+      drupal_add_css(drupal_get_path('module', 'create_payment') .'/css/create_payment.css');
+    }
+      
+    /**	* Implementation of hook_permission().
+	*/
+	function create_payment_permission() {
+	  // Restrict access to either of your new URLs.
+	  return array(
+	    'access payment page' => array(
+	      'title' => t('Access payment page'),
+	      'description' => t('Allow users to access payment page'),
+	    ),
+	  );
+	}
+	   
+    
+    /***
+    * hook_menu
+    ***/
+    function create_payment_menu() {        
+            $items = array();            
+            $items['create_payment'] = array(
+		    'title' => 'Add Payment',
+		    'page callback' => 'drupal_get_form',
+		    'page arguments' => array('add_payment'),
+		    'access arguments' => array('access payment page'),
+		    'access callback' => 'user_access',
+                    'type' => MENU_CALLBACK,
+            );
+	    
+	    $items['edit_payment/%'] = array(
+	    'title' => t('Edit Payment'),
+	    'page callback' => 'drupal_get_form',
+	    'page arguments' => array('payment_edit', 1),
+	    'access arguments' => array('access payment page'),
+	    'access callback' => 'user_access',
+	    'type' => MENU_CALLBACK,
+	    );
+
+            return $items;
+    }
+    
+    /***
+    * function to create add job resource form
+    ***/
+    function add_payment() {
+	$invoice_id = arg(1);
+	$invoice_id = decr(check_plain($invoice_id));
+	//$invoice_id =138;
+	//prepare jobs dropdown
+	$result_invoice = db_select('node', 'n')
+	->fields('n', array('nid','title'))
+	->condition('type', 'invoice','=')
+	->execute();
+	
+	$invoice_options=array();
+	
+	while($arr_invoice = $result_invoice->fetchAssoc()){	
+		$invoice_options[$arr_invoice['nid']] = $arr_invoice['title'];
+	}
+	
+	$form = array();	
+	$form['payment_title'] = array(
+	   '#type' => 'textfield',
+	   '#title' => t('Title'),
+	   '#default_value' => '',
+	   '#size' => 40,
+	   '#required' => true,
+	);
+
+	$form['payment_invoice'] = array(
+	   '#type' => 'select',
+	   '#title' => t('Choose Invoice'),	   
+	   '#options' => $invoice_options,
+	   '#default_value' => $invoice_id,
+	   '#attributes' => array('disabled' => array('disabled')),
+	);
+	
+	$form['payment_amount'] = array(
+	   '#type' => 'textfield',
+	   '#title' => t('Received Amount'),
+	   '#default_value' => '',
+	   '#size' => 20,
+	   '#required' => true,
+	);
+	
+	$form['payment_note'] = array(
+	   '#type' => 'textarea',
+	   '#title' => t('Notes'),
+	   '#default_value' => '',
+	   '#size' => 20,
+	);
+	
+	$checksum_options = array();
+	$checksum_options= array(
+				 ''=>'-Select-',
+				 'No'=>'No',
+				 'Yes'=>'Yes',);
+	
+	$form['payment_checksum'] = array(
+	   '#type' => 'select',
+	   '#title' => t('Checksum'),
+	   '#options' => $checksum_options,
+	   '#default_value' => '',
+	   '#required' => true,
+	);
+	
+	$form['payment_checque_no'] = array(
+	   '#type' => 'textfield',
+	   '#title' => t('Cheque No.'),
+	   '#default_value' => '',
+	   '#size' => 20,
+	   '#required' => true,
+	);
+	
+	$form['submit'] = array (
+	   '#prefix' => '<div id="job_submit">',
+	   '#type' => 'submit',
+	   '#value' => 'Submit',
+	   '#suffix' => '</div>'
+	);
+	
+	return $form;
+    }
+    
+    function add_payment_validate($form, &$form_state) {
+      if(!empty($form_state['values']['payment_amount']) && !is_numeric($form_state['values']['payment_amount'])) {
+		form_set_error('payment_amount', t('Please enter numeric values only for Received Amount field'));
+	}
+    }
+    
+    /***
+     * function to create edit job resource form
+    ***/
+    function payment_edit($form, &$form_state, $jrid) {
+    	$jrid = decr(check_plain($jrid));
+    	$payment_array = node_load($jrid);
+	
+    	//prepare jobs dropdown
+    	$result_invoice = db_select('node', 'n')
+    	->fields('n', array('nid','title'))
+    	->condition('type', 'invoice','=')
+    	->execute();
+    
+    	$invoice_options=array();
+    
+    	while($arr_invoice = $result_invoice->fetchAssoc()){    
+    		$invoice_options[$arr_invoice['nid']] = $arr_invoice['title'];
+    	}
+	
+    	$form = array();    
+    	$form['payment_title'] = array(
+    			'#type' => 'textfield',
+    			'#title' => t('Title'),
+    			'#default_value' => $payment_array->title,
+    			'#size' => 40,
+    			'#required' => true,
+    	);    
+    	
+    	$form['payment_invoice'] = array(
+    			'#type' => 'select',
+    			'#title' => t('Choose Invoice'),
+    			'#options' => $invoice_options,
+    			'#default_value' => $payment_array->field_invoice['und'][0]['nid'],
+    	);
+    
+    	$form['payment_amount'] = array(
+    			'#type' => 'textfield',
+    			'#title' => t('Amount Received'),
+    			'#default_value' => $payment_array->field_amount_received['und'][0]['value'],
+    			'#size' => 20,
+    			'#required' => true,
+    	);
+    
+    	$form['payment_note'] = array(
+    			'#type' => 'textarea',
+    			'#title' => t('Notes'),
+    			'#default_value' => $payment_array->field_payment_notes['und'][0]['value'],
+    	);
+	
+	
+	
+	$checksum_options = array();
+	$checksum_options= array(
+				 ''=>'-Select-',
+				 'No'=>'No',
+				 'Yes'=>'Yes',);
+	
+	$form['payment_checksum'] = array(
+	   '#type' => 'select',
+	   '#title' => t('Checksum'),
+	   '#options' => $checksum_options,
+	   '#default_value' => $payment_array->field_checksum['und'][0]['value'],
+	   '#required' => true,
+	);
+	
+	$form['payment_checque_no'] = array(
+	   '#type' => 'textfield',
+	   '#title' => t('Cheque No.'),
+	   '#default_value' => $payment_array->field_cheque_no['und'][0]['value'],
+	   '#size' => 20,
+	   '#required' => true,
+	);
+	
+    	
+    	$form['jrid'] = array(
+    			'#type' => 'hidden',
+    			'#title' => t('Job Resource Id'),
+    			'#default_value' => $jrid,
+    			'#size' => 40,
+    	);
+    
+    	$form['submit'] = array (
+    			'#prefix' => '<div id="job_submit">',
+    			'#type' => 'submit',
+    			'#value' => 'Submit',
+    			'#suffix' => '</div>'
+    	);
+    
+    	return $form;
+    }
+    
+     /***
+    * hook_form_validate
+    ***/
+    function payment_edit_validate($form, &$form_state) {
+      if(!empty($form_state['values']['payment_amount']) && !is_numeric($form_state['values']['payment_amount'])) {
+		form_set_error('payment_amount', t('Please enter numeric values only for Amount Received field'));
+	}
+    }
+    
+     /***
+    * hook_submit
+    ***/
+    function add_payment_submit($form, &$form_state) {
+      
+      //echo "<pre>";
+    //  print_r($form_state);
+      $payment_invoice = check_plain($form_state['values']['payment_invoice']);
+      /********************************/
+	
+	 
+      $query = "SELECT field_job_nid FROM 
+	      { field_data_field_job } 	     
+	      WHERE ((entity_id = '".$payment_invoice."') AND (deleted = '0'))";
+      $result = returnArrayOfObject($query);
+	/********************************/
+	  foreach($result AS $values) {	   
+         $job_id =   $values->field_job_nid;	 
+	  }
+	
+	
+	$payment_title = check_plain($form_state['values']['payment_title']);
+			
+	$payment_amount = check_plain($form_state['values']['payment_amount']);
+	$payment_note = check_plain($form_state['values']['payment_note']);
+	$payment_checksum = check_plain($form_state['values']['payment_checksum']);
+	$payment_checque_no = check_plain($form_state['values']['payment_checque_no']);
+	
+	$node = new stdClass();
+	$node->title = $payment_title;		
+	$node->type = 'payment';		
+	$node->language = LANGUAGE_NONE;
+	$node->created = time();
+	$node->log = t('Payment created: '.$node->title);
+
+	node_object_prepare($node); //sets up all the default values
+	
+	$node->field_invoice['und'][0]['nid'] = $payment_invoice;
+	$node->field_amount_received['und'][0]['value'] = $payment_amount;		
+	$node->field_payment_notes['und'][0]['value'] = $payment_note;
+	$node->field_checksum['und'][0]['value'] = $payment_checksum;
+	$node->field_cheque_no['und'][0]['value'] = $payment_checque_no;
+	
+	node_save($node);
+	
+	/********* Update Job node to update status ***********************/
+	$node_job = node_load($job_id);
+	$node_job->field_job_status['und'][0]['value']= 6;
+	node_save($node_job);
+	/********************************/
+
+	//structure the notification message		  
+	$output = t("A new Payment @name has been added successfully.", array(
+	'@name' => $payment_title,		      
+	)
+	);
+	 
+	drupal_set_message($output);
+	drupal_goto('user-dashboard');
+    }
+    
+    
+    function payment_edit_submit($form, &$form_state){
+    	$jrid = decr(check_plain($form_state['values']['jrid']));
+    	//load the existing node
+    	$node = node_load($jrid);
+    	
+	$payment_title = check_plain($form_state['values']['payment_title']);
+	$payment_invoice = check_plain($form_state['values']['payment_invoice']);		
+	$payment_amount = check_plain($form_state['values']['payment_amount']);
+	$payment_note = check_plain($form_state['values']['payment_note']);
+	$payment_checksum = check_plain($form_state['values']['payment_checksum']);
+	$payment_checque_no = check_plain($form_state['values']['payment_checque_no']);
+    	
+    	$node->title = $payment_title;
+    	$node->type = 'payment';
+    	$node->language = LANGUAGE_NONE;
+    	$node->created = time();
+    	$node->log = t('Payment edited: '.$node->title);
+	
+    	$node->field_invoice['und'][0]['nid'] = $payment_invoice;
+    	$node->field_amount_received['und'][0]['value'] = $payment_amount;
+    	$node->field_payment_notes['und'][0]['value'] = $payment_note;
+	$node->field_checksum['und'][0]['value'] = $payment_checksum;
+	$node->field_cheque_no['und'][0]['value'] = $payment_checque_no;
+	
+    	node_save($node);
+    	
+    	//structure the notification message
+    	$output = t("A payment @name has been updated successfully.", array(
+    		  '@name' => $payment_title,
+	  )
+    	);
+    	
+    	drupal_set_message($output);
+	drupal_goto('user-dashboard');
+    }

@@ -1,0 +1,20 @@
+.resource_link a.ctools-use-modal {
+    color:#789D26;
+    font-weight:bold;
+}
+
+.job_resource_cont fieldset.form-wrapper {
+    margin-bottom: 20px;
+    padding: 20px;
+    width: 60%;
+}
+
+#add_more_jr {
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+#form-jobs label.error {
+    float: none;
+    padding-left: 180px;
+}

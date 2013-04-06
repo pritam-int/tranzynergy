@@ -1,0 +1,492 @@
+
+#form-invoices, 
+#form-invoices-edit{
+	background-color:#f4f4f4;
+	border-radius:10px;
+	-webkit-border-radius:10px;
+	border:solid 1px #ddd;
+	margin-bottom:15px;
+	height:100%;
+	overflow:hidden;
+}
+#form-invoices .customers_name, 
+#form-invoices-edit .customers_name{
+	background-color:#ededed;
+	padding: 9px 15px;
+	border-radius:10px 10px 0 0;
+	-webkit-border-radius:10px 10px 0 0;
+	height:100%;
+	overflow:hidden;
+}
+#form-invoices .customers_name label, 
+#form-invoices-edit .customers_name label{
+	font-size:13px;
+	line-height:30px;
+	font-weight:bold !important;
+	float:left;
+	display:block;
+	width:88px !important;
+}  
+#form-invoices .customers_name select, 
+#form-invoices-edit .customers_name select{
+	padding: 5px 2px;
+    width: 270px;
+}
+#form-invoices .second_top, 
+#form-invoices-edit .second_top{
+	padding:22px;
+	height:100%;
+	overflow:hidden;
+}
+#form-invoices .bill_to_cont, 
+#form-invoices-edit .bill_to_cont{
+	float:left;
+	width:48%;
+}
+#form-invoices .bill_to_cont legend, 
+#form-invoices-edit .bill_to_cont legend{
+	padding-bottom:10px;	
+}
+#form-invoices .bill_to_cont fieldset, 
+#form-invoices-edit .bill_to_cont fieldset{
+	border:0;
+}
+#form-invoices .bill_to_cont textarea, 
+#form-invoices-edit .bill_to_cont textarea{
+	width:100%;
+	height:105px;
+	font:12px/15px Verdana, Geneva, sans-serif;
+	padding:5px;
+}
+#form-invoices .invoice_right_cont, 
+#form-invoices-edit .invoice_right_cont{
+	float:right;
+	width:45%;
+}
+#form-invoices .second_top label, 
+#form-invoices-edit .second_top label{
+	width:110px !important;	
+}
+#form-invoices .invoice_right_cont .description, 
+#form-invoices-edit .invoice_right_cont .description{
+    font-size: 9px;
+    line-height: 23px;
+}
+#form-invoices .second_top input[type="text"], 
+#form-invoices-edit .second_top input[type="text"]{
+    height: 20px;
+    padding: 3px;
+    width: 300px;
+}
+
+
+#form-invoices .job_cont, 
+#form-invoices-edit .job_cont{
+	padding:15px;
+}
+#form-invoices .job_cont .table_header, 
+#form-invoices-edit .job_cont .table_header{
+	height:28px;
+}
+#form-invoices .job_cont .table_header div, 
+#form-invoices-edit .job_cont .table_header div{
+	float:left;
+	width:230px;
+}
+#form-invoices .job_cont #edit-job-invoice-form, 
+#form-invoices-edit .job_cont #edit-job-invoice-form{
+	border:0;	
+}
+#form-invoices .job_cont #edit-job-invoice-form legend, 
+#form-invoices-edit .job_cont #edit-job-invoice-form legend{
+	display:none;
+}
+/*#form-invoices .job_cont #edit-job-invoice-form .job_row div{
+	float: left;
+	width: 165px;
+}*/
+#form-invoices .job_cont #edit-job-invoice-form input[type="text"], 
+#form-invoices-edit .job_cont #edit-job-invoice-form input[type="text"]{
+    height: 20px;
+    padding: 3px;
+    width: 100%;
+}
+#form-invoices #invoice_submit_cont, 
+#form-invoices-edit #invoice_submit_cont{
+	padding:0 15px;
+	height:100%;
+	overflow:hidden;
+}
+#form-invoices #invoice_submit_cont #invoice_submit, 
+#form-invoices-edit #invoice_submit_cont #invoice_submit{
+	float:left;
+	margin-right:20px;
+}
+#form-invoices #invoice_submit_cont input[type="submit"], 
+#form-invoices-edit #invoice_submit_cont input[type="submit"]{
+	margin-left:0;
+}
+#form-invoices #invoice_submit_cont .invoice_cancel, 
+#form-invoices-edit #invoice_submit_cont .invoice_cancel{
+	float:left;	
+}
+#form-invoices #invoice_submit_cont .invoice_cancel a, 
+#form-invoices-edit #invoice_submit_cont .invoice_cancel a{
+    background: none repeat scroll 0 0 #050505;
+    border: medium none;
+    border-radius: 5px 5px 5px 5px;
+    color: #FFFFFF;
+    cursor: pointer;
+    font: bold 12px/23px Arial,Helvetica,sans-serif;
+	display:block;
+	width:64px;
+	height:23px;
+	text-align:center;
+}
+
+#edit-delivery-date .form-item label,
+#edit-invoice-date .form-item label,
+#edit-due-date .form-item label {
+	display:none;
+}
+
+
+#form-invoices .second_top .invoice_right_cont input[type="text"], 
+#form-invoices-edit .second_top .invoice_right_cont input[type="text"]{
+width: 193px;
+}
+
+#form-invoices .second_top .form-item-due-date-date input[type="text"],
+#form-invoices .second_top .form-item-invoice-date-date input[type="text"], 
+#form-invoices-edit .second_top .form-item-invoice-date-date input[type="text"], 
+#form-invoices-edit .second_top .form-item-due-date-date input[type="text"]{
+    width: 192px;
+}
+
+div.job_row{
+	height:28px;
+	overflow:hidden;
+}
+
+
+div.table_header div{
+    background: none repeat scroll 0 0 #447017;
+    color: #FFFFFF;
+    font: bold 12px/28px Arial,Helvetica,sans-serif;
+    padding:0;
+	text-align:center;
+}
+
+.step_one div.job_desc{
+    float: left;
+    width: 390px !important;
+}
+.step_one div.po_number{
+    float: left;
+    width: 185px !important;
+}
+.step_one div.job_volume{
+    float: left;
+    width: 150px !important;
+}
+.step_one div.job_rate{
+    float: left;
+    width: 100px !important;
+}
+.step_one div.job_total{
+    float: left;
+    width: 100px !important;
+}
+
+.invoice_cancel a{
+    background: none repeat scroll 0 0 #050505;
+    border: medium none;
+    border-radius: 5px;
+    color: #FFFFFF;
+    cursor: pointer;
+    font: bold 12px/23px Arial,Helvetica,sans-serif;
+    margin-left: 9px;
+    padding: 0 15px;
+	display:block;
+}
+
+
+#invoice_submit_cont .form-submit {
+margin-left: 19px;
+}
+
+
+
+#invoice_submit_cont{
+height:100%;
+overflow:hidden;
+padding-bottom:20px;
+}
+
+
+#invoice_submit{
+float:left;
+}
+
+.invoice_cancel{
+float:left;
+}
+
+
+#form-invoices .form-item-send-email-and-create-pdf, 
+#form-invoices-edit .form-item-send-email-and-create-pdf{
+	padding:0 16px;
+	width:95%;
+}
+
+#form-invoices #edit-not-allowed-to-edit-in-future,
+#form-invoices .form-item-send-email-and-create-pdf input[type="checkbox"], 
+#form-invoices-edit #edit-not-allowed-to-edit-in-future, 
+#form-invoices-edit .form-item-send-email-and-create-pdf input[type="checkbox"]{
+	float:left;
+	margin-right:10px;
+	position:relative;
+	top:5px;
+}
+
+#form-invoices #edit-not-allowed-to-edit-in-future, 
+#form-invoices-edit #edit-not-allowed-to-edit-in-future{
+	margin-left:15px;
+}
+
+#form-invoices .form-item-not-allowed-to-edit-in-future label,
+#form-invoices .form-item-send-email-and-create-pdf label, 
+#form-invoices-edit .form-item-not-allowed-to-edit-in-future label, 
+#form-invoices-edit .form-item-send-email-and-create-pdf label{
+	width:90%;
+	float:left;
+	font-weight:bold;
+	font-size:14px;
+}
+
+#form-invoices .notes_cont .form-item-notes label, 
+#form-invoices-edit .notes_cont .form-item-notes label{
+	font-weight:bold;
+}
+
+#form-invoices .notes_cont .form-item-notes .form-textarea-wrapper, 
+#form-invoices-edit .notes_cont .form-item-notes .form-textarea-wrapper{
+	float:left;
+	width:100%;
+}
+#form-invoices .project_manager{
+	height:100%;
+	overflow:hidden;
+}
+#form-invoices .invoice_status, 
+#form-invoices-edit .invoice_status{
+	margin: 10px 0;
+	clear:both;
+}
+
+/*#form-invoices .invoice_status .form-item-invoice-status, 
+#form-invoices-edit .invoice_status .form-item-invoice-status{
+	margin-left: 15px;
+}*/
+
+#form-invoices .bill_to_inner .notes_cont .form-textarea, 
+#form-invoices-edit .bill_to_inner .notes_cont .form-textarea{
+	height:85px;
+}
+#form-invoices .form-item-invoice-status label, 
+#form-invoices-edit .form-item-invoice-status label{
+	width:110px;
+}
+#form-invoices .form-item-invoice-status select, 
+#form-invoices-edit .form-item-invoice-status select{
+	padding: 5px 2px;
+    width: 201px;
+	float:left;
+}
+
+#edit-job-invoice-form .job_row label {
+	display:none;
+}
+
+#form-invoices .bill_to_cont .send_to_email label{
+	width:70px !important;	
+}
+#form-invoices .bill_to_cont .send_to_email input[type="text"]{
+	width:357px;
+}
+
+
+.step_two {
+	display:none;
+}
+
+.step_two {
+	min-height:150px;
+}
+
+.prev_step,
+.next_step {
+	float: left;
+	margin-right: 20px;
+	margin-left:18px;
+	clear:both;
+}
+
+.prev_step .form-submit,
+.next_step .form-submit {
+	margin-left:0px;
+}
+#form-invoices .job_resource_invoice_cont, 
+#form-invoices-edit .job_resource_invoice_cont{
+	padding:15px;	
+}
+#form-invoices .job_resource_invoice_cont .table_header, 
+#form-invoices-edit .job_resource_invoice_cont .table_header{
+	height:100%;
+	overflow:hidden;
+}
+#form-invoices .job_resource_invoice_cont .table_header .job_name, 
+#edit-job-resource-form .job_name, 
+#form-invoices-edit .job_resource_invoice_cont .job_name{
+	float:left;
+	width:177px;
+	padding:0;
+}
+#form-invoices .job_resource_invoice_cont .table_header .job_resource, 
+#edit-job-resource-form .job_resource, 
+#form-invoices-edit .job_resource_invoice_cont .job_resource{
+	float:left;
+	width:150px;
+	padding:0;
+}
+#form-invoices .job_resource_invoice_cont .table_header .role, 
+#edit-job-resource-form .job_role, 
+#form-invoices-edit .job_resource_invoice_cont .role{
+	float:left;
+	width:150px;
+	padding:0;
+}
+#form-invoices .job_resource_invoice_cont .table_header .job_rate, 
+#edit-job-resource-form .job_rate, 
+#form-invoices-edit .job_resource_invoice_cont .job_rate{
+	float:left;
+	width:150px;
+	padding:0;
+}
+#form-invoices .job_resource_invoice_cont .table_header .job_count, 
+#edit-job-resource-form .job_count, 
+#form-invoices-edit .job_resource_invoice_cont .job_count{
+	float:left;
+	width:150px;
+	padding:0;
+}
+#form-invoices .job_resource_invoice_cont .table_header .job_total, 
+#edit-job-resource-form .job_total, 
+#form-invoices-edit .job_resource_invoice_cont .job_total{
+	float:left;
+	width:150px;
+	padding:0;
+}
+#edit-job-resource-form{
+	clear:both;
+	border:0;
+	padding-bottom:15px;
+}
+#edit-job-resource-form .form-item{
+	padding-bottom:0;	
+}
+#edit-job-resource-form .job_resource_container{
+	clear:both;
+}
+#edit-job-resource-form legend{
+	display:none;	
+}
+#edit-job-resource-form input[type=text]{
+    height: 20px;
+    padding: 3px !important;
+    width: 100% !important;	
+}
+#form-invoices .job_resource_invoice_cont .prev_step, 
+#form-invoices-edit .job_resource_invoice_cont .prev_step{
+	margin-left:0;	
+}
+#form-invoices .step_three{
+	clear:both;
+	padding:10px 0 0 0;
+}
+
+.red{
+	border:solid 1px #F00;	
+}
+
+#form-invoices .job_total_invoice, 
+#form-invoices .job_total_allocated, 
+#form-invoices-edit .job_total_invoice, 
+#form-invoices-edit .job_total_allocated{
+	float:right;
+	width:265px;
+	clear:both;
+}
+#form-invoices .job_total_invoice label, 
+#form-invoices .job_total_allocated label, 
+#form-invoices-edit .job_total_invoice label, 
+#form-invoices-edit .job_total_allocated label{
+	font-size:13px;
+	line-height:30px;
+	font-weight:bold !important;
+	float:left;
+	display:block;
+	width:98px !important;
+}
+#form-invoices .job_total_invoice input[type="text"], 
+#form-invoices .job_total_allocated input[type="text"], 
+#form-invoices-edit .job_total_invoice input[type="text"], 
+#form-invoices-edit .job_total_allocated input[type="text"]{
+	float:left;
+    height: 20px;
+    padding: 3px;
+    width:140px;
+	margin-left:15px;
+}
+
+#form-invoices-edit .form-item-not-allowed-to-edit-in-future{
+	clear:both;	
+	padding-top:10px;
+}
+#form-invoices-edit .form-item-not-allowed-to-edit-in-future input{
+	margin-left:0 !important;	
+}
+
+#form-invoices-edit .alloc_msg,
+#form-invoices .alloc_msg{
+	clear:both;
+	margin-bottom:25px;
+	font-size:12px;
+	line-height:14px;
+	font-style:italic;
+	text-align:center;
+	padding:7px;
+	color:#571010;
+	background-color:#ffe8e8;
+	border:solid 1px #fbc4c4;
+}
+
+
+#block-user-dashboard-dashboard-my-invoice .views-field-translator{
+	width:100px;
+}
+#block-user-dashboard-dashboard-my-invoice .views-field-job-name{
+	width:100px;	
+}
+#block-user-dashboard-dashboard-my-invoice .views-field-php-3{
+	width:60px;
+}
+#block-user-dashboard-dashboard-my-invoice .views-field-field-po-number{
+	width:60px;
+}
+#block-user-dashboard-dashboard-my-invoice .views-field-field-job-status{
+	width:60px;	
+}
+#block-user-dashboard-dashboard-my-invoice .views-field-pm{
+	width:60px;	
+}

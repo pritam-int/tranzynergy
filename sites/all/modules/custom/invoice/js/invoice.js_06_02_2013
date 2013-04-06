@@ -1,0 +1,271 @@
+
+(function($){
+	$(document).ready(function(){
+		
+		/******** Make it readonly **********/
+		if($('.readonly_class input')) {
+			$('.readonly_class input').attr('readonly', 'readonly');
+		}
+		/******** End of Make it readonly **********/
+		
+		
+		/****** Job Rate and Volume calculate for total - step 1 ******/
+		$('.job_cont .job_volume input').bind('keyup blur', function() {
+			calculate_volume(this);
+		});
+		
+		$('.job_cont .job_rate input').bind('keyup blur', function() {
+			calculate_rate(this);
+		});
+		
+		$('#edit-not-allowed-to-edit-in-future').click(function(){
+			active_button();
+		});
+		
+		//Manage active and inactive
+		active_button();
+		
+		/****** End of "Job Rate and Volume calculate for total - step 1 " ******/
+		
+		/****** Job Resource Rate and Volume calculate for total - step 2 ******/
+		$('.job_resource_invoice_cont .job_resource_container .job_count input').bind('keyup blur', function() {
+			calculate_resource_volume(this);
+			
+			//calculate total allocations
+			calculate_total_allocation_amount();
+			
+			//Manage active and inactive
+			active_button();
+		});
+		
+		$('.job_resource_invoice_cont .job_resource_container .job_rate input').bind('keyup blur', function() {
+			calculate_resource_rate(this);
+			
+			//calculate total allocations
+			calculate_total_allocation_amount();
+			
+			//Manage active and inactive
+			active_button();
+		});
+		/****** End of "Job Resource Rate and Volume calculate for total - step 2 " ******/
+		
+		
+		/*********** Invoice Different Step Management **************/
+		$('.next_step .next_step_button').click(function(){
+			$('.step_one').slideUp('slow');
+			$('.step_two').slideDown('slow');			
+			$('.main_cont h2').html('Allocations');			
+		});
+		
+		$('.prev_step .prev_step_button').click(function(){
+			$('.step_one').slideDown('slow');
+			$('.step_two').slideUp('slow');
+			$('.main_cont h2').html('Invoice Form');
+		});		
+		/******** End of Invoice Different Step Management **********/		
+		
+		/******** New JS for invoice 95% calculation ********/
+		$('.job_cont .job_row .job_volume input, .job_cont .job_row .job_rate input, .job_cont .job_row .job_total input').bind('change blur', function() {
+			var total_invoice = 0.00;
+			$('.job_cont .job_row .job_total input').each(function( index ) {
+				var total_val = $(this).val();
+				total_invoice += parseFloat(total_val);
+			});
+			
+			total_invoice = parseFloat(total_invoice);
+			$('#job_invoice_final_total').val(total_invoice.toFixed(2));
+		});
+		/******** End of "New JS for invoice 95% calculation - Biswa" ********/
+		
+	});
+	
+	/******* Calculate Job - step 1 *******/
+	function calculate_volume(id) {
+		var volume = $(id).val();			
+		var rate = $(id).parent().parent('.job_volume').next('.job_rate').find('input').val();
+		
+		if((volume != 0 && volume != '') && (rate != 0 && rate != '')){
+			var total = volume * rate;
+			$(id).parent().parent('.job_volume').next('.job_rate').next('.job_total').find('input').val(total.toFixed(2));
+		}
+	}
+	
+	function calculate_rate(id) {
+		var rate = $(id).val();			
+		var volume = $(id).parent().parent('.job_rate').prev('.job_volume').find('input').val();
+		
+		if((volume != 0 && volume != '') && (rate != 0 && rate != '')){
+			var total = volume * rate;
+			$(id).parent().parent('.job_rate').next('.job_total').find('input').val(total.toFixed(2));
+		}
+	}
+	/******* End of "Calculate Job - step 1 " *******/
+	
+	/******* Calculate Job Resource - step 2 *******/
+	function calculate_resource_volume(id) {
+		var volume = $(id).val();			
+		var rate = $(id).parent().parent('.job_count').prev('.job_rate').find('input').val();
+		
+		if((volume != '') && (rate != '')){
+			var total = volume * rate * 0.95;
+			total = parseFloat(total);
+			$(id).parent().parent('.job_count').next('.job_total').find('input').val(total.toFixed(2));
+		}
+	}
+	
+	function calculate_resource_rate(id) {		
+		var rate = $(id).val();			
+		var volume = $(id).parent().parent('.job_rate').next('.job_count').find('input').val();
+		
+		if((volume != '') && (rate != '')){
+			var total = volume * rate * 0.95;
+			total = parseFloat(total);
+			$(id).parent().parent('.job_rate').next('.job_count').next('.job_total').find('input').val(total.toFixed(2));
+		}
+	}
+	/******* End of "Calculate Job Resource - step 2 " *******/
+	
+	/*** "Calculate total allocation" ***/
+	function calculate_total_allocation_amount(){
+		var all_total_job_resource_amount = 0.00;
+		$('.job_resource_invoice_cont .job_resource_container .job_total input').each(function( index ) {
+			var resource_total = $(this).val();
+			if(resource_total != "")
+			all_total_job_resource_amount += parseFloat(resource_total);
+		});
+		
+		all_total_job_resource_amount = parseFloat(all_total_job_resource_amount);
+		$('.job_total_allocated #total_allocated').val(all_total_job_resource_amount.toFixed(2));
+		
+		var job_total_invoice = $('.job_total_invoice #total_invoice').val();
+		
+		job_total_invoice = parseFloat(job_total_invoice); 
+		var difference = job_total_invoice-all_total_job_resource_amount;
+		
+		difference = parseFloat(difference);
+		
+		$('.job_invoice_difference #invoice_difference_val').val(difference.toFixed(2));		
+	}
+	/*** End of "Calculate total allocation" ***/
+	
+})(jQuery);
+
+function changeJobPrice(type){
+	switch(type){
+		case 'job':
+			var job_count = jQuery('#number_of_job').val();
+			job_count = parseInt(job_count);
+			//alert(job_count);
+			job_count += 3;
+			var total = 0;
+			for(i = 1; i <= job_count; i++){
+				var job_total = jQuery.trim(jQuery('#edit-total-'+i).val());
+				//alert(job_total)
+				if(job_total == "")
+					job_total = 0.0;
+					
+				job_total = parseFloat(job_total);
+						
+				total += job_total;
+			}
+			
+			var final_total = total.toFixed(2);
+			var job_resource_count = jQuery('#counter_alloc').val();
+			final_total = (final_total*0.05);
+			jQuery('#edit-total-alloc-'+job_resource_count).val(final_total.toFixed(2));
+			
+			jQuery('#total_job_price').val(total.toFixed(2));
+			
+			var total_invoice = total*0.95;
+			jQuery('#total_invoice').val(total_invoice.toFixed(2));
+			
+			var total = 0.0;
+			for(i = 0; i <= job_resource_count; i++){
+				var job_total = jQuery.trim(jQuery('#edit-total-alloc-'+i).val());
+				
+				if(job_total == "")
+					job_total = 0.0;
+					
+				job_total = parseFloat(job_total);
+						
+				total += job_total;
+			}
+			jQuery('#total_resource_alloc').val(total.toFixed(2));
+			jQuery('#total_allocated').val(total.toFixed(2));
+			
+			active_button();
+			break;
+		case 'job_resource':
+			var job_resource_count = jQuery('#counter_alloc').val();
+			job_resource_count = parseInt(job_resource_count);
+			
+			var total = 0.0;
+			for(i = 0; i <= job_resource_count; i++){
+				var job_total = jQuery.trim(jQuery('#edit-total-alloc-'+i).val());
+				
+				if(job_total == "")
+					job_total = 0.0;
+					
+				job_total = parseFloat(job_total);
+						
+				total += job_total;
+			}
+			//alert(total);
+			
+			jQuery('#total_resource_alloc').val(total.toFixed(2));
+			jQuery('#total_allocated').val(total.toFixed(2));
+			active_button();
+			break;
+	}
+	
+	return false;
+}
+
+/********* To manage the button active/inactive **********/
+function active_button() {
+	/*var invoice_total_price = jQuery('#total_job_price').val();
+	var resource_total_price = jQuery('#total_resource_alloc').val(); */
+	
+	var invoice_total_price = jQuery('.job_total_invoice #total_invoice').val();
+	var resource_total_price = jQuery('.job_total_allocated #total_allocated').val();	
+	var difference = parseFloat(invoice_total_price-resource_total_price);
+	difference = parseFloat(difference.toFixed(2));
+	jQuery('.job_invoice_difference #invoice_difference_val').val(difference);
+		
+	//alert(difference);
+	if(difference == 0 || (difference <= .05 && difference >= -0.05)){		
+		jQuery('#invoice_submit #edit-submit').attr('disabled', false);
+		jQuery('#invoice_submit #edit-submit').css('background','#050505');
+		
+		jQuery('#total_allocated').removeClass('red');
+		jQuery('.job_invoice_difference #invoice_difference_val').removeClass('red');
+		
+		if(jQuery('#edit-not-allowed-to-edit-in-future').is(':checked')) {		
+			jQuery('#edit-submit-create-and-send').removeAttr('disabled');
+			jQuery('#edit-submit-create-and-send').css('background','#050505');
+			jQuery('#send').val(1);
+		
+		} else {
+			jQuery('#edit-submit-create-and-send').attr('disabled', 'disabled');
+			jQuery('#edit-submit-create-and-send').css('background','#E6E6E6');
+			jQuery('#send').val(0);
+		}
+		//jQuery('.alloc_msg_print').removeClass('alloc_msg');		
+		jQuery('.alloc_msg').css('display','none');
+		//jQuery('.alloc_msg_print').html('');
+	} else {
+		jQuery('#invoice_submit #edit-submit').attr('disabled', true);
+		jQuery('#invoice_submit #edit-submit').css('background','#E6E6E6');
+		
+		jQuery('#edit-submit-create-and-send').attr('disabled', 'disabled');
+		jQuery('#edit-submit-create-and-send').css('background','#E6E6E6');
+		jQuery('#send').val(0);
+		jQuery('#total_allocated').addClass('red');
+		jQuery('.job_invoice_difference #invoice_difference_val').addClass('red');
+		jQuery('.alloc_msg').css('display','block');
+		//jQuery('.alloc_msg_print').addClass('alloc_msg');
+		jQuery('.alloc_msg_print').html('The total allocation must equal the needed allocation to finalize the invoice.');
+	}
+	
+}
+/********* End of "To manage the button active/inactive" **********/

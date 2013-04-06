@@ -1,0 +1,73 @@
+.resource_link a.ctools-use-modal {
+
+    color:#789D26;
+
+    font-weight:bold;
+
+}
+
+
+
+.job_resource_cont fieldset.form-wrapper {
+
+    margin-bottom: 20px;
+
+    padding: 20px;
+
+    width: 60%;
+
+}
+
+
+
+#add_more_jr {
+
+    cursor: pointer;
+
+    text-decoration: underline;
+
+}
+
+
+
+#form-jobs label.error {
+
+    float: none;
+
+    padding-left: 180px;
+
+}
+
+
+
+.job_resource_container{
+
+	position:relative;	
+
+}
+
+.job_resource_container img{
+
+	position:absolute;
+
+	top:6px;
+
+	right:0;
+
+	cursor:pointer;
+
+}
+
+#job_resource_0 img{
+top:30px;
+}
+
+
+
+#job_resource_1 img{
+	top:4px !important;
+}
+
+
+
+

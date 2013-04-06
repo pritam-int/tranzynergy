@@ -1,0 +1,6 @@
+; $Id$
+name = Add Ajax Multiple Job Resource
+description = This module has been created to Add Multiple job resources form with Ajax
+core = 7.x
+package = Custom Module
+version = 7.0.1

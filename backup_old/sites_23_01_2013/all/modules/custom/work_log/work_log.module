@@ -1,0 +1,167 @@
+<?php
+    /**
+    ** Implementation of hook_permission().
+    **/
+    function work_log_permission() {
+      // Restrict access to either of your new URLs.
+      return array(
+	'access work log page' => array(
+	  'title' => t('Access Work Log'),
+	  'description' => t('Allow user role to access work log page'),
+	),
+      );
+    }
+    
+    /***
+    * hook_menu
+    ***/
+    function work_log_menu() {        
+            $items = array();            
+            $items['work_log'] = array(
+		'title' => 'Export csv',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('work_logs'),
+		'access arguments' => array('access work log page'),
+		'access callback' => 'user_access',
+		'type' => MENU_NORMAL_ITEM,
+            );
+	    
+            return $items;
+    }
+    
+    /***
+    * function to create add job form
+    ***/
+    function work_logs() {
+   
+      $query = "SELECT node.nid AS nid, node.created AS node_created
+		FROM 
+	      {node} node
+	     
+	      WHERE (( (node.status = '1') AND (node.type IN  ('invoice')) ))
+	      ORDER BY node_created DESC";
+      $result = returnArrayOfObject($query);
+      
+      $ar = array();
+      $i = 0;
+      foreach($result AS $values) {
+	$nid = $values->nid;
+	$invoice_node = node_load($nid);
+	
+	$invoice_nid = $invoice_node->nid;	
+	$invoice_title = $invoice_node->title;
+	$ar[$i]['invoice_nid']=$invoice_nid ;
+	
+	$created_by_nid = $invoice_node->uid;	
+	$created_by = user_load($created_by_nid);
+	$created_by_name = $created_by->name;
+	$ar[$i]['created_by']=$created_by_name;	
+	
+	$invoice_date = $invoice_node->field_date_of_invoice['und'][0]['value'];
+	$ar[$i]['invoice_date']=$invoice_date;	
+	
+	/****************************/
+	$job_nid = $invoice_node->field_job['und'][0]['nid'];
+	$job_node = node_load($job_nid);
+	//pre_disp($job_node);
+	$job_title = $job_node->title;
+	$customer_nid = $job_node->field_customer['und'][0]['nid'];
+	$customer_node = node_load($customer_nid);
+	$customer_title = $customer_node->title;
+	$ar[$i]['customer_title']=$customer_title;
+	/********************************/
+	
+	$job_id = $job_node->nid;
+	$ar[$i]['order_no']= $job_id;	
+	
+	$job_description = $job_node->field_description['und'][0]['value'];
+	$ar[$i]['job_description']= strip_tags($job_description);
+	
+	$field_amount = $invoice_node->field_amount['und'][0]['value'];
+	$ar[$i]['invoice_total']=$field_amount;
+	
+	/*$work_done_by_id = $invoice_node->field_for_the_user['und'][0]['uid'];
+	$work_done_by = user_load($work_done_by_id);
+	$work_done_by_name = $work_done_by->name;*/
+	
+	$job_resource_id = $invoice_node->field_job_resource_id['und'][0]['nid'];
+	$job_resource_load = node_load($job_resource_id);
+	//pre_disp($job_resource_load);
+	
+	/******************************/
+	$field_count = $job_resource_load->field_count['und'][0]['value'];
+	$ar[$i]['volume']=$field_count;
+	
+	$job_created_by_id = $job_node->uid;
+	$job_created_by_load = user_load($job_created_by_id);
+	$job_created_by_name = $job_created_by_load->name;
+	$ar[$i]['finder']=$job_created_by_name;
+	
+	$field_rate  =  $job_resource_load->field_rate['und'][0]['value'];
+	$job_assigned = $job_resource_load->field_job_assigned['und'][0]['nid'];
+	
+	$job_term_id= $job_resource_load->field_job_type['und'][0]['tid'];
+	
+	/*******************************************/
+	$query2 = db_select('field_data_field_invoice', 'inv');
+	$query2->fields('inv', array('entity_id', 'revision_id'));
+	$query2->condition('field_invoice_nid', $invoice_nid, '=');
+	$result2 = $query2->execute();
+	$term_data = $result2->fetchAssoc();
+	$payment_id = $term_data['entity_id'];
+		
+	$payment_load = node_load($payment_id);
+	
+	$cheque_no = $payment_load->field_cheque_no['und'][0]['value'];
+	$ar[$i]['cheque_no']=$cheque_no;
+	
+	$date_due = $job_node->field_date_due['und'][0]['value'];
+	$ar[$i]['date_due']=$date_due;
+	
+	$date_receive = $job_node->field_date_received['und'][0]['value'];
+	$ar[$i]['date_receive']= $date_receive;
+	
+	$amount_received= $payment_load->field_amount_received['und'][0]['value'];
+	$ar[$i]['amount_received']=$amount_received;
+	
+	$field_checksum = $payment_load->field_checksum['und'][0]['value'];
+	$ar[$i]['field_checksum']=$field_checksum;
+	
+	$field_amount = $invoice_node->field_amount['und'][0]['value'];
+	$ar[$i]['total_allocation']=$field_amount;
+	
+	$i++;
+      }
+   
+   
+   $time_stamp = time();
+   
+   header('Content-Type: text/csv; charset=utf-8');
+   header('Content-Disposition: attachment; filename=work_log_'.$time_stamp.'.csv');
+   $output = fopen('php://output', 'w');
+   $column[0] = 'Invoice#';
+   $column[1] = 'Submitted By';   
+   $column[2] = 'Invoice Date';
+   $column[3] = 'Customer';
+   $column[4] = 'Order No#';
+   $column[5] = 'Description';
+   $column[6] = 'Invoice Total';
+   $column[7] = 'Volume';
+   $column[8] = 'Finder';
+   $column[9] = 'Chq No';   
+   $column[10] = 'Date due';
+   $column[11] = 'Date Received';   
+   $column[12] = 'Amount received';
+   $column[13] = 'Checksum';
+   $column[14] = 'Total Allocation';
+   
+   fputcsv($output, $column);
+   if(count($ar)>0){
+    for($j = 0;$j<count($ar); $j++)
+    {
+	fputcsv($output, $ar[$j]);
+    }	
+    exit();	
+    } 
+   
+    }

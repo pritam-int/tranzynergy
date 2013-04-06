@@ -1,0 +1,7 @@
+(function($) {
+    $(document).ready(function(){
+        $('.view-header .top_button_cont .search_my_job_link').click(function(){
+            $('#search-my-job-form').slideToggle('slow');
+        });
+    });
+}(jQuery));

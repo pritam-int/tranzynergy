@@ -1,0 +1,487 @@
+<?php
+/**
+ * Define pages supplied by this module and their paths.
+ * @return array An array of paths and their related data.
+ */
+function generate_pdf_invoice_menu() {
+	$items = array();
+	
+	$items['generate_pdf_invoice/%'] = array(
+		'page callback' => 'generate_pdf_invoice_report',
+		'access arguments' => array('access Generate PDF invoice'),
+		'access callback' => 'user_access',
+		'type' => MENU_CALLBACK,
+	);
+      
+	return $items;
+}
+
+/**
+* Implementation of hook_permission().
+**/
+function generate_pdf_invoice_permission() {
+  // Restrict access to either of your new URLs.
+  return array(
+    'access Generate PDF invoice' => array(
+      'title' => t('access Generate PDF invoice'),
+      'description' => t('Allow users to Create PDF invoice'),
+    ),
+  );
+}
+
+
+//PDF Generation from here
+function generate_pdf_invoice_report($bill_to_id = 0) {
+	$result =  array();
+	
+	if($bill_to_id == 0) $bill_to_id = arg(1);
+	//$job_nid = trim(check_plain($job_nid)); //Need to decrypt
+	
+	/*if(!empty($job_nid)){
+		$node = node_load($job_nid);
+		
+		$project_mng_uid = $node->uid;
+		$project_mng = user_load($project_mng_uid);
+		
+		$project_mng_pic = 'sites/default/files/logo.png';
+		
+		$result['job'] = array(					
+						'job_id' => $node->nid,
+						'job_title' => $node->title
+					);
+		
+		$result['project_mngr'] = array(
+							'name' => $project_mng->name,
+							'email' => $project_mng->mail,
+							'profile_pic' => $project_mng_pic,
+						);
+		
+		$pdfPath = _generate_recommendation_pdf($result,$job_nid);	
+	}*/
+	
+	$pdfPath = _generate_recommendation_pdf($bill_to_id);
+}
+
+function _generate_recommendation_pdf($bill_to_id, $mailsend, $send_to_email) {
+	global $user;
+	
+	$file	= drupal_get_path('module', 'generate_pdf_invoice') ."/fpdf/fpdf.php";
+	if (is_file($file)) {
+	   require_once $file;
+	}
+	///////////////////////////////////////////////////////////////////////////////////////////////////
+	class PDF extends FPDF {
+	
+		//Page header
+		function Header() {			
+			$this->SetX(12);
+			$this->SetY(12);
+			$imagePath	= "./".drupal_get_path('module', 'generate_pdf_invoice') ."/images/logo.png";
+			//Logo
+			$this->Image($imagePath,81,12,50);
+			
+			//$this->Ln(3);
+			
+			$this->SetX(12);
+			$this->SetY(12);
+			
+			$this->SetFont('Arial','',9);
+			//Title
+			$this->Ln(3);
+			$this->Cell(194,30,'8725 Test Road Suite C-2',0,0,'C');
+		
+			//Line break
+			$this->Ln(4);
+			$this->Cell(194,30,'TestCity, Nevada 32345',0,0,'C');
+			    
+			$this->Ln(4);
+			$this->Cell(194,30,'Phone: 233-851-7788',0,0,'C');
+			
+			$this->Ln(24);
+		}
+	
+		//Page footer
+		function Footer() {
+		    //Position at 1.5 cm from bottom
+		    $this->SetY(-15);
+		    //Arial italic 8
+		    $this->SetFont('Arial','I',8);
+		}
+	}
+        
+	$bill_to_details = node_load($bill_to_id);
+    
+    /*pre_disp($node_job);
+    exit();*/
+    
+    //Customer Details
+    $customer_nid = $bill_to_details->field_customer_name['und'][0]['value'];
+    $customer = node_load($customer_nid);
+    $customer_name = $customer->title;
+    $customer_email = $customer->field_email['und'][0]['value'];
+    
+    $bill_to = $bill_to_details->field_bill_to['und'][0]['value'];
+    $field_invoice_date = $bill_to_details->field_invoice_date['und'][0]['value'];
+    $invoice_due_date = $bill_to_details->field_invoice_due_date['und'][0]['value'];
+    $delivery_date = $bill_to_details->field_job_delivery_date['und'][0]['value'];
+    $project_mngr_name = $bill_to_details->field_project_manager['und'][0]['value'];
+    $notes = $bill_to_details->field_notes['und'][0]['value'];
+    $status = $bill_to_details->field_invoice_status['und'][0]['value'];
+    $not_allowed = $bill_to_details->field_not_allow_to_edit_in_futur['und'][0]['value'];
+    $invoice_no = $bill_to_details->field_invoice_no['und'][0]['value'];	
+    
+	switch($status) {
+		case 1:
+			$ori_status = "Sent";
+			break;
+		case 2:
+			$ori_status = "Pending";
+			break;
+		case 3:
+			$ori_status = "Paid";
+			break;
+		case 4:
+			$ori_status = "Voided";
+			break;			
+		
+	}	    
+    
+    $current_date = date('Y-m-d');
+	
+	//Instanciation of inherited class
+	$pdf=new PDF();
+	$pdf->AliasNbPages();
+	$pdf->AddPage();
+	
+	$pdf->SetX(134);	
+	$pdf->SetFont('Arial','',9);	
+	$pdf->Cell(40,5,"DATE:         ".$current_date, 0 ,0,'L');
+	$pdf->Ln(5);
+	
+   $pdf->SetX(134);	
+	$pdf->Cell(40,5,"DUE DATE: ".$invoice_due_date, 0 ,0,'L');
+	$pdf->Ln(5);
+	
+	/*$pdf->SetX(134);
+	$pdf->Cell(40,5,"DELIVERY DATE:    ".$delivery_date, 0 ,0,'L');
+	$pdf->Ln(5);*/
+	
+	$pdf->SetX(134);
+	//$pdf->Cell(40,5,"ORDER NO: ".$order_no, 0 ,0,'L');
+	$pdf->Cell(40,5,"PROJECT MANAGER: ".$project_mngr_name, 0 ,0,'L');
+	$pdf->Ln(5);
+
+	$pdf->SetX(134);
+	$pdf->Cell(40,5,"INVOICE NO.:    ".'TZ_'.$invoice_no, 0 ,0,'L');
+	$pdf->Ln(5);
+	
+	
+	
+	
+	
+	
+	
+	/***************************/
+	
+	
+		
+	$pdf->SetX(0);
+	$pdf->SetY(45);
+	$pdf->SetFont('Arial','',9);
+	$pdf->Cell(40,10,'Bill To:', 0 ,0,'L');
+	
+	//$pdf->SetY(16);
+	//$pdf->Line(5,52,45, 52);	
+	//$pdf->Line(5,52,5, 82);
+	//$pdf->Line(5,82,45, 82);
+	//$pdf->Line(45,52,45, 82);
+	
+	$pdf->SetX(0);
+	$pdf->SetY(55);
+	$pdf->Cell(65,5,$bill_to, 0 ,1,'L');
+	$pdf->Ln(5);
+	
+	$pdf->SetX(0);
+	$pdf->SetY(70);
+	$pdf->SetFont('Arial','',9);
+	$pdf->Cell(40,10,'Notes:', 0 ,0,'L');
+	
+	$pdf->SetX(0);
+	$pdf->SetY(80);
+	$pdf->Cell(65,5,$notes, 0 ,1,'L');
+	$pdf->Ln(20);
+	
+	
+	
+	
+	/***************************/
+	$pdf->SetX(5);
+	$pdf->SetFont('Arial','',9);
+	$pdf->SetFillColor(46,139,87);
+	$pdf->Cell(80,4,'Description', 1 ,0,'C');
+	
+	$pdf->Cell(30,4,'PO Number', 1 ,0,'C');
+	
+	$pdf->Cell(30,4,'Volume', 1, 0,'C');
+	
+	$pdf->Cell(30,4,'Rate', 1, 0,'R');
+	
+	$pdf->Cell(30,4,'Total', 1, 0,'R');	
+		
+	$pdf->SetX(5);
+	$pdf->SetFont('Arial','',9);
+	
+	$query = "SELECT node.nid AS nid, node.created AS node_created
+	      FROM 
+	      {node} node
+	      LEFT JOIN {field_data_field_for_bill_to} field_data_field_for_bill_to ON node.nid = field_data_field_for_bill_to.entity_id AND (field_data_field_for_bill_to.entity_type = 'node' AND field_data_field_for_bill_to.deleted = '0')
+	      WHERE (( (node.status = '1') AND (node.type IN  ('job_details_for_invoice')) AND (field_data_field_for_bill_to.field_for_bill_to_nid IN  ('$bill_to_id')) ))
+	      ORDER BY node_created DESC";
+    $result = returnArrayOfObject($query);
+	//echo "<pre>";
+	//print_r($result);exit;
+	 $sub_total = 0;
+    foreach($result AS $jnid) {
+      $i++;
+      $node_job =  node_load($jnid->nid);
+      //
+      //pre_disp($node_job);
+      //exit();
+      //
+      $final_count = $node_job->field_count['und'][0]['value'];
+      $po_number = $node_job->field_po_number['und'][0]['value'];
+      $rate = $node_job->field_rate['und'][0]['value'];
+      $job_nid_ref = $node_job->field_job['und'][0]['nid'];
+      $delivery_date = $node_job->field_delivery_date['und'][0]['value'];
+      
+      $total_amount = $final_count * $rate;
+      $total = number_format($total_amount,2,'.',',');
+
+	if($delivery_date != "")
+	{
+		$d_arr = explode(" ", $delivery_date);
+		$d_dt_arr = explode("-", $d_arr[0]);			
+		
+		$d_date = 'Delivered Date:'.$d_dt_arr[1]."-".$d_dt_arr[2].'-'.$d_dt_arr[0];
+	}	 
+	else 
+	{
+		$d_date = "";
+	}	 
+	 	 
+	$pdf->Ln(4);
+	$pdf->SetX(5);
+	$pdf->SetFont('Arial','',9);
+	$pdf->Cell(80,4, $d_date." ".$node_job->title,1,0,'C');
+	$pdf->Cell(30,4, $po_number,1,0,'C');		
+	$pdf->Cell(30,4, $final_count,1,0,'C');
+	$pdf->Cell(30,4, '$'.number_format($rate,2,'.',','),1,0,'R');
+	$pdf->Cell(30,4, '$'.$total,1,0,'R');
+	
+	$sub_total += $total_amount; // Amount added static
+		
+	}
+	
+	//$total_amount += $sub_total_price; // Amount added static
+      
+    
+    
+       
+	for($j=0;$j<1;$j++){		
+	        $pdf->Ln(4);
+		$pdf->SetX(5);
+		$pdf->SetFont('Arial','',9);
+		$pdf->Cell(80,4, '',1,0,'C');	
+		$pdf->Cell(30,4, '',1,0,'C');	
+		$pdf->Cell(30,4, '',1,0,'C');
+		$pdf->Cell(30,4, '',1,0,'R');
+		$pdf->Cell(30,4, '',1,0,'C');	
+	}
+	
+     
+	
+     
+	/*$pdf->Ln(4);
+	$pdf->SetX(5);
+	$pdf->SetFont('Arial','',9);
+	$pdf->Cell(80,4, '',1,0,'C');	
+	$pdf->Cell(30,4, '',1,0,'C');	
+	$pdf->Cell(30,4, '',1,0,'C');
+	$pdf->Cell(30,4, 'Additional Charges',1,0,'R');
+	$pdf->Cell(30,4, "$"."100",1,0,'C');
+	
+	$pdf->Ln(4);
+	$pdf->SetX(5);
+	$pdf->SetFont('Arial','I',9);
+	$pdf->Cell(80,4, '',0,0,'C');
+	$pdf->Cell(30,4, '',0,0,'C');		
+	$pdf->Cell(30,4, '',0,0,'C');
+	$pdf->Cell(30,4, 'SUB TOTAL',1,0,'R');
+	$pdf->Cell(30,4, "$"."120",1,0,'C');
+	
+	$pdf->Ln(4);
+	$pdf->SetX(5);
+	$pdf->SetFont('Arial','I',9);
+	$pdf->Cell(80,4, '',0,0,'C');	
+	$pdf->Cell(30,4, '',0,0,'C');	
+	$pdf->Cell(30,4, '',0,0,'C');
+	$pdf->Cell(30,4, 'TAX RATE',1,0,'R');
+	$pdf->Cell(30,4, '',1,0,'C');
+	
+	$pdf->Ln(4);
+	$pdf->SetX(5);
+	$pdf->SetFont('Arial','I',9);
+	$pdf->Cell(80,4, '',0,0,'C');
+	$pdf->Cell(30,4, '',0,0,'C');		
+	$pdf->Cell(30,4, '',0,0,'C');
+	$pdf->Cell(30,4, 'SALES TAX',1,0,'R');
+	$pdf->Cell(30,4, '-',1,0,'C');
+	
+	
+	$pdf->Ln(4);
+	$pdf->SetX(5);
+	$pdf->SetFont('Arial','I',9);
+	$pdf->Cell(80,4, '',0,0,'C');	
+	$pdf->Cell(30,4, '',0,0,'C');	
+	$pdf->Cell(30,4, '',0,0,'C');
+	$pdf->Cell(30,4, 'OTHER',1,0,'R');
+	$pdf->Cell(30,4, '-',1,0,'C');*/
+	
+	
+	$pdf->Ln(4);
+	$pdf->SetX(5);
+	$pdf->SetFont('Arial','I',9);
+	$pdf->Cell(80,4, '',0,0,'C');
+	$pdf->Cell(30,4, '',0,0,'C');		
+	$pdf->Cell(30,4, '',0,0,'C');
+	$pdf->Cell(30,4, 'TOTAL',1,0,'R');
+	$pdf->Cell(30,4, "$".number_format($sub_total,2,'.',','),1,0,'R');
+	$pdf->Ln(5);
+	
+	$pdf->SetX(5);
+	//$pdf->SetY(150);
+	$pdf->Cell(65,5," Send Remittance to:", 0 ,1,'L');
+	//$pdf->Ln(1);	
+	
+	$pdf->SetX(5);
+	//$pdf->SetY(155);
+	$pdf->Cell(65,5,"TranZynergy", 0 ,1,'L');
+	//$pdf->Ln(1);
+	
+	$pdf->SetX(5);
+	//$pdf->SetY(160);
+	$pdf->Cell(65,5, "C/O ".$project_mngr_name, 0 ,1,'L');
+	//$pdf->Ln(1);	
+	
+	$pdf->SetX(5);
+	//$pdf->SetY(165);
+	$pdf->Cell(65,5,"1435 North, 280 West Orem", 0 ,1,'L');
+	//$pdf->Ln(1);
+	
+	$pdf->SetX(5);
+	//$pdf->SetY(170);
+	$pdf->SetFont('Arial','',9);
+	$pdf->Cell(65,5,'UT 84057', 0 ,1,'L');
+	 
+	/*$demo_txt = "Please make checks payable to ".$company_name." \nSend Remittance to:\n".$company_name."\n".$company_address."\n\nTHANK YOU FOR YOUR BUSINESS";
+	
+	$current_y = $pdf->GetY();
+	$current_x = (int)$pdf->GetX();		
+	$current_y = $current_y - 7;
+	
+	$pdf->SetXY(7,$current_y);
+	$pdf->SetFont('Arial','I',9);
+	$pdf->MultiCell(200,4, $demo_txt,0,'L',0);	*/	
+		
+	$pdfDirPath	= 'sites/default/files/invoices/';
+	if (!is_dir($pdfDirPath)) {
+		@mkdir($pdfDirPath);
+		@chmod($pdfDirPath, 0777); // Necessary for non-webserver users.
+	}
+	$file_name = 'invoices_'.time().'.pdf';
+	$pdfPath = $pdfDirPath.$file_name;
+	
+	/******* Attached the PDF file in Invoice *****/
+	
+	foreach($result AS $jnid) {
+		
+		$node_job =  node_load($jnid->nid);
+		
+		$job_nid_ref = $node_job->field_job['und'][0]['nid'];
+		
+      
+		$query_invoice = "SELECT node.nid AS nid, node.created AS node_created
+					FROM 
+					{node} node
+					LEFT JOIN {field_data_field_job} field_data_field_job ON node.nid = field_data_field_job.entity_id AND (field_data_field_job.entity_type = 'node' AND field_data_field_job.deleted = '0')
+					WHERE (( (node.status = '1') AND (node.type IN  ('invoice')) AND (field_data_field_job.field_job_nid IN  ('$job_nid_ref')) ))
+					ORDER BY node_created DESC";
+		$result_invoices = returnArrayOfObject($query_invoice);
+		
+		$node_invoice = node_load($result_invoices[0]->nid);
+		$node_invoice->field_pdf_invoice_name['und'][0]['value'] = $file_name;
+		node_save($node_invoice);
+	}
+	/******* Attached the PDF file in Invoice End*****/
+		
+	
+	//echo $mailsend;exit;
+	if($mailsend == 1)
+	{
+		$full_path = DRUPAL_ROOT.'/'.$pdfPath;
+	
+		/* Need to change later */
+		//global $user;
+		$message = "Dear $customer_name, <br /><br />
+			The Invoice for the job has been created successfully. Please find the attachment to check the invoice details. <br /><br />
+			Thanks";
+		if(!empty($send_to_email)){
+			$mailto = $send_to_email;//"jason.dodd@gmail.com";//
+		}else{
+			$mailto = $customer_email;//"jason.dodd@gmail.com";//
+		}
+		//$mailto = $customer_email;//"jason.dodd@gmail.com";//
+		
+		//$mailto .= ','.$job_assigner_user_emails;
+	
+		//$mailto = 'sajal.sadhukhan@indusnet.co.in'; //Need to remove it
+	
+		$subject = "Invoice Generated";
+		$from_name = "Tranzynergy";
+		//$from_mail = "jason.dodd@gmail.com";
+		$from_mail = "no-reply@tranzynergy.com";
+		$file = $full_path;
+		$file_size = filesize($file);
+		$handle = fopen($file, "r");
+		$content = fread($handle, $file_size);
+		fclose($handle);
+		$content = chunk_split(base64_encode($content));
+		$uid = md5(uniqid(time()));
+		$name = basename($file);
+		$header = "From: ".$from_name." <".$from_mail.">\r\n";
+		//$header .= "Reply-To: ".$replyto."\r\n";
+		$header .= "MIME-Version: 1.0\r\n";
+		$header .= "Content-Type: multipart/mixed; boundary=\"".$uid."\"\r\n\r\n";
+		$header .= "This is a multi-part message in MIME format.\r\n";
+		$header .= "--".$uid."\r\n";
+		$header .= "Content-type:text/html; charset=iso-8859-1\r\n";
+		$header .= "Content-Transfer-Encoding: 7bit\r\n\r\n";
+		$header .= $message."\r\n\r\n";
+		$header .= "--".$uid."\r\n";
+		$header .= "Content-Type: application/pdf; name=\"".$file_name."\"\r\n"; // use different content types here
+		$header .= "Content-Transfer-Encoding: base64\r\n";
+		$header .= "Content-Disposition: attachment; filename=\"".$file_name."\"\r\n\r\n";
+		$header .= $content."\r\n\r\n";
+		$header .= "--".$uid."--";
+		
+		if (mail($mailto, $subject, $message, $header)) {
+	    	//echo "mail send ... OK"; // or use booleans here
+		} else {
+	    		//echo "mail send ... ERROR!";
+		}
+	}
+
+	$pdf->Output($pdfPath,'F');
+	$pdf->Output($pdfPath,'D');
+
+}

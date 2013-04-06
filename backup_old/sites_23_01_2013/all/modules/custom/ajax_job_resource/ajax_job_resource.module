@@ -1,0 +1,114 @@
+<?php
+  /**
+  * Implementation of hook_permission().
+  */
+  function ajax_job_resource_permission() {
+    // Restrict access to either of your new URLs.
+    return array(
+      'access job resource page' => array(
+	'title' => t('Access add job resource form'),
+	'description' => t('Allow users to access add/edit job resource page'),
+      ),
+    );
+  }
+	 
+  
+  /***
+  * hook_menu
+  ***/
+  function ajax_job_resource_menu() {        
+	  $items = array();	    
+	  $items['ajax_job_resources'] = array(
+	    'page callback' => 'get_ajax_multiple_field_form',
+	    'access arguments' => array('access job resource page'),
+	    'access callback' => 'user_access',
+	    'type' => MENU_CALLBACK,
+	  );
+	  
+	  return $items;
+  }
+  
+  /**
+  * Get the form
+  **/
+  function get_ajax_multiple_field_form() {    
+    $ajax_form = drupal_render(drupal_get_form('ajax_job_resources_multiple_fields'));
+    print $text = preg_replace('#</?form[^>]*>#is', '', $ajax_form);
+  }
+  
+  /***
+  * function to create add job resource form
+  ***/
+  function ajax_job_resources_multiple_fields() {    
+    $i = $_POST['group_count'];
+    
+    //prepare user dropdown	
+    $users = entity_load('user');
+    
+    $user_options=array();
+    foreach($users as $key => $val){
+      foreach($val->roles AS $key2=>$val2){
+	if($key2==13){
+	  $user_options[$val->uid] = $val->name;
+	}
+      }
+    }
+    
+    $result_term = db_select('taxonomy_term_data', 'n')
+		    ->fields('n', array('tid','name'))
+		    ->condition('vid', '4','=')
+		    ->execute();
+	
+    $term_options=array();    
+    while($arr_term = $result_term->fetchAssoc()){
+      $term_options[$arr_term['tid']] = $arr_term['name'];
+    }
+    
+    $form = array();
+    $jrf = 'job_resource_form';
+   $image_path = drupal_get_path('module', 'form_job').'/image/minus-1.png'; 
+	$form[$jrf]['job_resource_minus_'.$i] = array(
+		 	//'#markup' => l("__",'', array('attributes' => array('onclick' => "return delResource($i)"))),
+		 	'#markup' => theme_image(array('path' => $image_path,'attributes' => array('onclick' => "return delResource($i)"))),
+		 	'#prefix' => '<div  class="job_resource_container inner_container" >',
+	      
+	   );	    
+    $form[$jrf]['job_type_'.$i] = array(
+      '#type' => 'select',
+      '#title' => t('Job Type'),
+      '#required' => true,
+      '#options' => $term_options,
+      '#default_value' => '',
+      //'#prefix' => '<div class="job_resource_container inner_container">',
+    );
+    
+    $form[$jrf]['work_done_by_'.$i] = array(
+      '#type' => 'select',
+      '#title' => t('Work Done By'),
+      '#options' => $user_options,
+      '#default_value' => '',
+    );
+
+    $form[$jrf]['rate_'.$i] = array(
+      '#type' => 'textfield',
+      '#title' => t('Rate'),
+      '#default_value' => '',
+      '#size' => 20,
+    );
+
+    $form[$jrf]['count_'.$i] = array(
+     '#type' => 'textfield',
+     '#title' => t('Count'),
+     '#default_value' => '',
+     '#size' => 20,
+     
+    );
+    $form[$jrf]['note_'.$i] = array(
+	      '#type' => 'textfield',
+	      '#title' => t('Note'),
+	      '#default_value' => '',
+	      '#size' => 20,
+	      '#suffix' => '</div>',
+	   );
+    return $form;
+  }

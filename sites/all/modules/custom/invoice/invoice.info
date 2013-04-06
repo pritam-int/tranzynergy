@@ -1,0 +1,6 @@
+; $Id$
+name = Invoice
+description = To Edit Invoices with custom form
+core = 7.x
+package = Custom Module
+version = 7.0.1

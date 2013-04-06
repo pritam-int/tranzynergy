@@ -1,0 +1,1849 @@
+<?php
+  /***
+  ** hook_init
+  ***/
+  function invoice_init() {
+    drupal_add_css(drupal_get_path('module', 'invoice') .'/css/invoice.css');
+    drupal_add_js(drupal_get_path('module', 'invoice') .'/js/invoice.js');    
+  }
+  
+  /**
+  ** hook_permission
+  */
+  function invoice_permission() {
+    // Restrict access to either of your new URLs.
+    return array(
+      'access edit invoice form' => array(
+	'title' => t('Edit invoice form'),
+	'description' => t('Allow users to Edit the Invoices'),
+      ),
+    );
+  }
+  
+  /***
+  ** hook_menu
+  ***/
+  function invoice_menu() {        
+    $items = array();            
+    $items['generate_invoice'] = array(
+      'title' => 'Invoice Form',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('form_invoices'),
+      'access arguments' => array('access edit invoice form'),
+      'access callback' => 'user_access',
+      'type' => MENU_NORMAL_ITEM,
+    );
+    
+    $items['edit_generated_invoice/%'] = array(
+      'title' => t('Edit Invoice'),
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('form_invoices_edit', 1),
+      'access arguments' => array('access edit invoice form'),
+      'access callback' => 'user_access',
+      'type' => MENU_NORMAL_ITEM,
+    );
+    
+    return $items;
+  }
+  
+  /***
+  * function to create add job form
+  ***/
+  function form_invoices() {
+    GLOBAL $user;
+    $uid = $user->uid;
+    $user_name = $user->name;    
+    $form = array();
+    
+    $job_nids =  array();
+    
+    if(!empty($_POST['job_nids'])) {
+      $_SESSION['job_nids'] = trim(check_plain($_POST['job_nids']));
+    }
+    
+    //$job_nids_posted = '292,286'; // Need to make it dynamic // for local
+    //$job_nids_posted = '260,266,270'; // Need to make it dynamic // dev site
+    
+    if(!empty($_POST['job_nids'])) {
+      $job_nids_posted = trim(check_plain($_POST['job_nids']));
+    } else if (!empty($_SESSION['job_nids'])) {
+      $job_nids_posted = $_SESSION['job_nids'];
+    } else {
+      drupal_set_message('Please select atleast one Job', 'error');
+      drupal_goto('user-dashboard');
+    }
+    
+    $pos = strpos($job_nids_posted, ',');
+    if ($pos == true) {
+      $job_nids = explode(',', $job_nids_posted);
+    } else {
+      $job_nids[0] = $job_nids_posted;
+    }
+    
+    $job_nids = explode(',', $job_nids_posted); //need to remove
+    
+    //pre_disp($job_nids);
+    $job_node = node_load($job_nids[0]);
+    
+    //Customer Details
+    $customer_nid = $job_node->field_customer['und'][0]['nid'];
+    $customer = node_load($customer_nid);
+    //pre_disp($customer);
+    $customer_name = $customer->title;
+    $customer_email = $customer->field_email['und'][0]['value'];
+    
+    //Project Details
+    $project_nid = $job_node->field_project_name['und'][0]['nid'];
+    $project = node_load($project_nid);
+    //pre_disp($project);
+    $project_mngr_id = $project->uid;
+    
+    $project_mngr = user_load($project_mngr_id);
+    $project_mngr_name = $project_mngr->name;
+    
+    $user_id = $job_node->uid;
+    $user_arr = user_load($user_id);
+    $company_name = check_plain($user_arr->field_company_name['und'][0]['value']);
+    $company_address = check_plain($user_arr->field_company_address['und'][0]['value']);
+    $company_city = check_plain($user_arr->field_city['und'][0]['value']);
+    $company_state = check_plain($user_arr->field_state['und'][0]['value']);
+    $company_zip = check_plain($user_arr->field_zipcode['und'][0]['value']);
+    $company_phone = check_plain($user_arr->field_main_phone['und'][0]['value']);
+    
+    //$bill_to = $customer_name.', '.$company_address.', '.$company_city.', '.$company_state.', '.$company_zip.', '.$company_phone;
+    if(!empty($customer_name)) {
+      $bill_to .= $customer_name;
+    }
+    
+    if(!empty($customer_email)) {
+      $bill_to .= ', '.$customer_email;
+    }
+    
+    if(!empty($company_address)) {
+      $bill_to .= ', '.$company_address;
+    }
+    
+    if(!empty($company_city)) {
+      $bill_to .= ', '.$company_city;
+    }
+    
+    if(!empty($company_state)) {
+      $bill_to .= ', '.$company_state;
+    }
+    
+    if(!empty($company_zip)) {
+      $bill_to .= ', '.$company_zip;
+    }
+    
+    if(!empty($company_phone)) {
+      $bill_to .= ', '.$company_phone;
+    }
+    
+    $form['customer'] = array(
+      '#type' => 'select',
+      '#title' => t('Customer'),
+      '#required' => true,
+      '#options' => customers_list(),
+      '#attributes' => array('disabled' => 'disabled'),
+      '#default_value' => $customer_nid,
+      '#prefix' => '<div class="step_one"><div class="customers_name">',
+      '#suffix' => "</div>",
+    );
+    
+    $bt = 'bill_to';
+    $form[$bt] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Bill To'),
+      '#collapsible' => TRUE,
+      '#collapsed' => FALSE,
+      '#prefix' => '<div class="second_top"><div class="bill_to_cont">',
+      '#suffix' => '</div>',
+    );
+    
+    $form[$bt]['bill_to'] = array(
+      '#type' => 'textarea',
+      '#default_value' => $bill_to,
+      '#prefix' => '<div class="bill_to_inner"><div class="bill_to">',
+      '#suffix' => "</div>",
+    );
+    
+    $form[$bt]['notes'] = array(
+      '#type' => 'textarea',
+      '#title' => t('Notes'),
+      '#prefix' => '<div class="notes_cont">',
+      '#suffix' => "</div>",
+    );
+    $form[$bt]['send_to'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Send To'),
+      '#default_value' => $customer_email,
+      '#prefix' => '<div class="send_to_email">',
+      '#suffix' => "</div>",
+    );
+    
+    //$dateformat = 'm/d/Y';
+   // print $default_value = date('m/d/Y');
+    
+    $dateformat = 'Y-m-d';
+    $default_value = date('Y-m-d');
+    
+    $form['invoice_date'] = array(
+      '#type' => 'date_popup',
+      '#date_timezone' => date_default_timezone(),
+      '#date_format' => $dateformat,
+      '#date_year_range' => '-3:+3',
+      '#title' => t('Invoice Date'),
+      '#prefix' => '<div class="invoice_right_cont"><div class="invoice_date"> <div class="invoice_date_cont">',
+      '#suffix' => "</div>",
+      '#default_value' => $default_value,
+    );
+    
+    $timeinfuture = strtotime("+31 days"); //after 31days
+    $default_value = date('Y-m-d', $timeinfuture);
+    $form['due_date'] = array(
+      '#type' => 'date_popup',
+      '#date_timezone' => date_default_timezone(),
+      '#date_format' => $dateformat,
+      '#date_year_range' => '-3:+3',
+      '#title' => t('Due Date'),      
+      '#prefix' => '<div class="project_id_cont"><div class="due_date">',
+      '#suffix' => "</div></div>",
+      '#default_value' => $default_value,
+    );
+    
+    $timeinfuture = strtotime("+31 days"); //after 31days
+    $default_value = date('Y-m-d', $timeinfuture);
+    /*$form['delivery_date'] = array(
+      '#type' => 'date_popup',
+      '#date_timezone' => date_default_timezone(),
+      '#date_format' => $dateformat,
+      '#date_year_range' => '-3:+3',
+      '#title' => t('Delivery Date'),      
+      '#prefix' => '<div class="project_id_cont"><div class="due_date">',
+      '#suffix' => "</div></div>",
+      '#default_value' => $default_value,
+    );*/
+    
+    $form['project_manager'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Project Manager'),
+      '#default_value' => $project_mngr_name,
+      '#prefix' => '<div class="project_manager">',
+      '#suffix' => "</div>",
+    );
+    
+    $form['invoice_status'] = array(
+      '#type' => 'select',
+      '#title' => t('Invoice Status'),
+      '#options' => invoice_status(),
+      '#prefix' => '<div class="invoice_status">',
+      '#suffix' => "</div></div></div></div>",
+    );
+    
+    $job_contents = '';
+    $job_contents .= '<div class="job_cont">';
+    $job_contents .= '<div class="job_row table_header">
+    
+			  <div class="job_desc">
+			    Description
+			  </div>
+			  
+			  <div class="po_number">
+			    PO Number
+			  </div>
+			  
+			  <div class="job_volume">
+			    Volume
+			  </div>			  
+			  
+			  <div class="job_rate">
+			    Rate
+			  </div>
+			  
+			  <div class="job_total">
+			    Total
+			  </div>
+			
+		      </div>';
+    
+    $i = 0; 
+    $jif = 'job_invoice_form';
+    $form[$jif] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Job Invoice'),
+      '#collapsible' => TRUE,
+      '#collapsed' => FALSE,
+      '#prefix' => $job_contents,
+      '#suffix' => '</div>',
+    );
+    $final_total = 0;
+    foreach($job_nids AS $jnid) {
+      $i++;
+      $node_job =  node_load($jnid);
+      
+      $final_count = $node_job->field_final_word_count['und'][0]['value'];
+      $po_number = $node_job->field_po_number['und'][0]['value'];
+      $rate = $node_job->field_rate['und'][0]['value'];
+      $delivery_date = $node_job->field_delivery_date['und'][0]['value'];	      
+      $final_word_count = $node_job->field_final_word_count['und'][0]['value'];
+      $final_rate = $node_job->field_rate['und'][0]['value'];
+      
+      if(empty($final_count) && empty($rate)) {
+	$query_jr = "SELECT node.title AS node_title, node.nid AS nid
+                     FROM
+                     {node} node
+                     LEFT JOIN {field_data_field_job_assigned} field_data_field_job_assigned ON node.nid = field_data_field_job_assigned.entity_id AND (field_data_field_job_assigned.entity_type = 'node' AND field_data_field_job_assigned.deleted = '0')
+                     WHERE (( (node.status = '1') AND (node.type IN  ('job_resource')) AND (field_data_field_job_assigned.field_job_assigned_nid IN  ('$jnid')) ))
+                     ORDER BY node_title ASC";
+	$result_jr = returnArrayOfObject($query_jr);
+	
+	$result_jr_nid = $result_jr[0]->nid;
+	$jr_node = node_load($result_jr_nid);
+	$field_rate = $jr_node->field_rate['und'][0]['value'];              
+	$field_count = $jr_node->field_count['und'][0]['value'];	
+	
+	$final_count = $field_count;
+	$rate = $field_rate;
+	
+	/*$k = 0;
+	foreach($result_jr as $rsj){
+	  $result_jr_nid = $result_jr[$k]->nid;
+	  $jr_node = node_load($result_jr_nid);
+	  $field_rate = $jr_node->field_rate['und'][0]['value'];              
+	  $field_count = $jr_node->field_count['und'][0]['value'];	
+	  
+	  $final_count += $field_count;
+	  $rate += $field_rate;
+	  $k++;
+	}*/
+	
+      }
+      
+      if(empty($final_count)) {	
+	$final_count = 0;
+      }
+      
+      if(empty($po_number)) {
+	$po_number = 0;
+      }
+      
+      if(empty($rate)) {
+	$rate = 0;
+      }
+      
+      $total_amount = $final_word_count * $final_rate;
+      //$total = '$'.number_format($total_amount,2,'.','');
+      $total = number_format($total_amount,2,'.','');
+      $final_total += $total; 
+  
+      if($delivery_date != "")
+      {
+	$d_arr = explode(" ", $delivery_date);
+	$d_dt_arr = explode("-", $d_arr[0]);			
+
+	$d_date = 'Delivered Date:'.$d_dt_arr[1]."-".$d_dt_arr[2].'-'.$d_dt_arr[0];
+      }	 
+      else 
+      {
+	$d_date = "";
+      }	  	
+      $form[$jif]['job_title_'.$i] = array(
+	'#type' => 'textfield',
+	'#default_value' => $d_date." ".$node_job->title,
+	'#prefix' => '<div class="job_row table_input"><div class="job_desc">',
+	'#suffix' => '</div>',
+      );
+      
+      $form[$jif]['po_number_'.$i] = array(
+	'#type' => 'textfield',
+	'#title' => t('PO Number'),
+	'#default_value' => $po_number,
+	'#required' => true,
+	'#prefix' => '<div class="po_number">',
+	'#suffix' => "</div>",
+      );
+      
+      $form[$jif]['volume_'.$i] = array(
+	'#type' => 'textfield',
+	'#title' => t('Volume'),
+	'#default_value' => $final_word_count,
+	'#required' => true,
+	'#prefix' => '<div class="job_volume">',
+	'#attributes' => array('onfocus' => "return changeJobPrice('job')", 'onblur' => "return changeJobPrice('job')" ),
+	'#suffix' => '</div>',
+      );
+      
+      $form[$jif]['rate_'.$i] = array(
+	'#type' => 'textfield',
+	'#title' => t('Rate'),
+	'#default_value' => $final_rate,
+	'#required' => true,
+	'#prefix' => '<div class="job_rate">',
+	'#attributes' => array('onfocus' => "return changeJobPrice('job')", 'onblur' => "return changeJobPrice('job')" ),
+	'#suffix' => '</div>',
+      );
+      
+      $form[$jif]['total_'.$i] = array(
+	'#type' => 'textfield',
+	'#title' => t('Total'),
+	'#default_value' => number_format($total,2,'.',''),
+	'#required' => true,
+	'#prefix' => '<div class="job_total">',
+	'#attributes' => array('onkeyup' => "return changeJobPrice('job')"),
+	'#suffix' => '</div></div>',
+      );
+      
+      $form['job_nid_'.$i] = array(
+	'#type' => 'hidden',
+	'#default_value' => $jnid,
+      );
+      
+    }
+    $form['total_job_price'] = array(
+      '#type' => 'hidden',
+      '#default_value' => number_format($final_total,2,'.',''),
+      '#attributes' => array('id' => 'total_job_price')
+    );
+    
+    for($j = $i+1; $j < $i+4; $j++)
+    {
+    	$form[$jif]['job_title_'.$j] = array(
+	'#type' => 'textfield',
+	'#default_value' => '',
+	'#prefix' => '<div class="job_row table_input"><div class="job_desc">',
+	'#suffix' => '</div>',
+      );
+      
+      $form[$jif]['po_number_'.$j] = array(
+	'#type' => 'textfield',
+	'#title' => t('PO Number'),
+	'#default_value' => '',
+	//'#required' => true,
+	'#prefix' => '<div class="po_number">',
+	'#suffix' => "</div>",
+      );
+      
+      $form[$jif]['volume_'.$j] = array(
+	'#type' => 'textfield',
+	'#title' => t('Volume'),
+	'#default_value' => '0',
+	//'#required' => true,
+	'#prefix' => '<div class="job_volume">',
+	'#attributes' => array('onfocus' => "return changeJobPrice('job')", 'onblur' => "return changeJobPrice('job')" ),
+	'#suffix' => '</div>',
+      );
+      
+      $form[$jif]['rate_'.$j] = array(
+	'#type' => 'textfield',
+	'#title' => t('Rate'),
+	'#default_value' => '0',
+	//'#required' => true,
+	'#prefix' => '<div class="job_rate">',
+	'#attributes' => array('onfocus' => "return changeJobPrice('job')", 'onblur' => "return changeJobPrice('job')" ),
+	'#suffix' => '</div>',
+      );
+      
+      $form[$jif]['total_'.$j] = array(
+	'#type' => 'textfield',
+	'#title' => t('Total'),
+	'#default_value' => '0.00',
+	//'#required' => true,
+	'#prefix' => '<div class="job_total">',
+	'#attributes' => array('onkeyup' => "return changeJobPrice('job')"),
+	'#suffix' => '</div></div>',
+      );
+      
+	$form['job_nid_'.$j] = array(
+	'#type' => 'hidden',
+	'#default_value' => "",
+      );
+    }	
+    
+    $form['number_of_job'] = array(
+      '#type' => 'hidden',
+      '#default_value' => $i,
+      '#attributes' => array('id' => 'number_of_job')
+    );
+    
+    $form['job_ids'] = array(
+      '#type' => 'hidden',
+      '#default_value' => $job_nids_posted,
+    );
+    
+    
+    $next_button = '<div class="next_step"><input class="next_step_button form-submit" type="button" name="next_step" id="next_step" value="Next" /></div>';
+    $form['next_button'] = array(
+      
+      //'#prefix' => '<div class="invoice_status">',
+      '#suffix' => $next_button."</div>",
+    );
+    
+    /*$form['invoice_status'] = array(
+      '#type' => 'select',
+      '#title' => t('Invoice Status'),
+      '#required' => true,
+      '#options' => invoice_status(),
+      '#prefix' => '<div class="invoice_status">',
+      '#suffix' => $next_button."</div></div>",
+    );*/
+    
+    /******************* Job Resource Allocations Form ************************/
+    
+    $job_allocations .= '<div class="job_alloc table_header">
+    
+			  <div class="job_name">
+			    Job
+			  </div>
+			  
+			  <div class="job_resource">
+			    Job Resource
+			  </div>
+			  
+			  <div class="role">
+			    Role
+			  </div>			  
+			  
+			  <div class="job_rate">
+			    Rate
+			  </div>
+			  
+			  <div class="job_count">
+			    Count
+			  </div>
+			  
+			  <div class="job_total">
+			    Total
+			  </div>
+			
+		      </div>';
+    
+    
+    $jrf = 'job_resource_form';
+    $previous_button = '<div class="prev_step"><input class="prev_step_button form-submit" type="button" name="prev_step" id="prev_step" value="Back" /></div>';
+    $form[$jrf] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Job Resource'),
+      '#collapsible' => TRUE,
+      '#collapsed' => FALSE,
+      '#prefix' => '<div class="step_two"><div class="job_resource_invoice_cont">'.$job_allocations,
+      '#suffix' => '',
+    );
+    
+    $i = 0;
+    $final_total_tz_val = 0;
+    $final_total_val = 0;
+    $allocation = 'alloc';
+    foreach($job_nids AS $jnid) {
+	$job = node_load($jnid); //Job Details
+	$job_title = $job->title;
+      
+	/* Job Resource */
+	$query_jr = "SELECT node.title AS node_title, node.nid AS nid
+		      FROM
+		      {node} node
+		      LEFT JOIN {field_data_field_job_assigned} field_data_field_job_assigned ON node.nid = field_data_field_job_assigned.entity_id AND (field_data_field_job_assigned.entity_type = 'node' AND field_data_field_job_assigned.deleted = '0')
+		      WHERE (( (node.status = '1') AND (node.type IN  ('job_resource')) AND (field_data_field_job_assigned.field_job_assigned_nid IN  ('$jnid')) ))
+		      ORDER BY node_title ASC";
+	$result_jr = returnArrayOfObject($query_jr);
+	$all_total = 0;
+	
+	
+	
+	foreach($result_jr AS $jr) {
+	  $jr_nid = $jr->nid; // Job Resource Nid
+	  $resource_node = node_load($jr_nid);
+	  //pre_disp($resource_node);
+	  
+	  $resource_id = $resource_node->field_member['und'][0]['uid'];
+	  $resource = user_load($resource_id);
+	  $resource_name = $resource->name;
+	  
+	  $job_type_id = $resource_node->field_job_type['und'][0]['tid'];
+	  $job_type = taxonomy_term_load($job_type_id);
+	  $role = $job_type->name;
+	  
+	  $rate_value = $resource_node->field_rate['und'][0]['value'];
+	  $count = $resource_node->field_count['und'][0]['value'];
+	  $total_value = $rate_value * $count;
+	  $all_total += $total_value;
+	  
+	  //$total_val = $total_value - ($total_value * 0.05);
+	  $total_val = number_format($total_value,2,'.','');
+	  $final_total_val += $total_val;
+	  
+	  $form[$jrf]['job_name_'.$allocation.'_'.$i] = array(
+	    '#type' => 'textfield',
+	    '#default_value' => $job_title,
+	    '#size' => 20,
+	    '#prefix' => '<div class="job_resource_container"><div class="job_name">',
+	    '#attributes' => array('readonly' => 'readonly'),
+	    '#suffix' => '</div>',
+	  );
+	  
+	  $form[$jrf]['job_resource_'.$allocation.'_'.$i] = array(
+	    '#type' => 'textfield',
+	    '#default_value' => $resource_name,
+	    '#size' => 20,
+	    '#prefix' => '<div class="job_resource">',
+	    '#attributes' => array('readonly' => 'readonly'),
+	    '#suffix' => '</div>',
+	  );
+	  
+	  $form[$jrf]['role_'.$allocation.'_'.$i] = array(
+	    '#type' => 'textfield',
+	    '#default_value' => $role,
+	    '#size' => 20,
+	    '#prefix' => '<div class="job_role">',
+	    '#attributes' => array('readonly' => 'readonly'),
+	    '#suffix' => '</div>',
+	  );
+	  
+	  $form[$jrf]['rate_'.$allocation.'_'.$i] = array(
+	    '#type' => 'textfield',
+	    '#default_value' => $rate_value,
+	    '#size' => 20,
+	    '#prefix' => '<div class="job_rate">',
+	    '#suffix' => '</div>',
+	  );
+	  
+	  $form[$jrf]['count_'.$allocation.'_'.$i] = array(
+	    '#type' => 'textfield',
+	    '#default_value' => $count,
+	    '#size' => 20,
+	    '#prefix' => '<div class="job_count">',
+	    '#suffix' => '</div>',
+	  );
+	  
+	  $form[$jrf]['total_'.$allocation.'_'.$i] = array(
+	    '#type' => 'textfield',
+	    '#default_value' => $total_val,
+	    '#size' => 20,
+	    '#prefix' => '<div class="job_total">',
+	    '#attributes' => array('onkeyup' => "return changeJobPrice('job_resource')"),
+	    '#suffix' => '</div></div>',
+	  );
+	  $form[$jrf]['job_id_'.$allocation.'_'.$i] = array(
+	  '#type' => 'hidden',
+	  '#default_value' => $jnid,
+	  '#size' => 20,
+	);
+	  $i++;	  
+	}
+	
+	/** For TZ 5% amount **/
+	$total_value_tz = $all_total * 0.05;
+	$total_value_tz = number_format($total_value_tz,2,'.','');
+	$final_total_tz_val += $total_value_tz;
+	
+	
+	
+	
+	/* End of Job Resource */
+	$form[$jrf]['job_id_'.$allocation.'_'.$i] = array(
+	  '#type' => 'hidden',
+	  '#default_value' => $jnid,
+	  '#size' => 20,
+	);
+	
+	//$i++;
+    }
+    $final_total = number_format($final_total,2,'.','');
+    $total_value_tz = $final_total*.05;
+    $total_value_tz = number_format($total_value_tz,2,'.','');
+    /* Static TZ line item */
+    $form[$jrf]['job_name_'.$allocation.'_'.$i] = array(
+	  '#type' => 'textfield',
+	  '#default_value' => $job_title,
+	  '#size' => 20,
+	  '#prefix' => '<div class="job_resource_container"><div class="job_name">',
+	  '#attributes' => array('readonly' => 'readonly', 'class' => array('job_name')),
+	  '#suffix' => '</div>',
+	);
+	
+	$form[$jrf]['job_resource_'.$allocation.'_'.$i] = array(
+	  '#type' => 'textfield',
+	  '#default_value' => 'TZ',
+	  '#size' => 20,
+	  '#prefix' => '<div class="job_resource">',
+	  '#attributes' => array('readonly' => 'readonly'),
+	  '#suffix' => '</div>',
+	);
+	
+	$form[$jrf]['role_'.$allocation.'_'.$i] = array(
+	  '#type' => 'textfield',
+	  '#default_value' => '',
+	  '#size' => 20,
+	  '#prefix' => '<div class="job_role">',
+	  '#attributes' => array('readonly' => 'readonly'),
+	  '#suffix' => '</div>',
+	);
+	
+	$form[$jrf]['rate_'.$allocation.'_'.$i] = array(
+	  '#type' => 'textfield',
+	  '#default_value' => '',
+	  '#size' => 20,
+	  '#prefix' => '<div class="job_rate">',
+	  '#attributes' => array('readonly' => 'readonly'),
+	  '#suffix' => '</div>',
+	);
+	
+	$form[$jrf]['count_'.$allocation.'_'.$i] = array(
+	  '#type' => 'textfield',
+	  '#default_value' => '',
+	  '#size' => 20,
+	  '#prefix' => '<div class="job_count">',
+	  '#attributes' => array('readonly' => 'readonly'),
+	  '#suffix' => '</div>',
+	);
+	
+	$form[$jrf]['total_'.$allocation.'_'.$i] = array(
+	  '#type' => 'textfield',
+	  '#default_value' => $total_value_tz,
+	  '#size' => 20,
+	  '#prefix' => '<div class="job_total">',
+	  '#attributes' => array('readonly' => 'readonly'),
+	  '#suffix' => '</div></div>',
+	);
+    
+    /***********************/
+    $form['tatal_invoice'] = array(
+	    '#type' => 'textfield',
+	    '#title' => t('Total Invoice'),
+	    '#default_value' => $final_total,
+	    '#size' => 20,
+	    '#prefix' => '<div class="job_total_invoice">',
+	    '#attributes' => array('readonly' => 'readonly', 'id'=>'total_invoice'),
+	    '#suffix' => '</div>',
+    );
+    $final_total_alloc = number_format(($total_value_tz + $final_total_val),2,'.','');
+    $form['tatal_allocated'] = array(
+	    '#type' => 'textfield',
+	    '#title' => t('Total Allocated'),
+	    '#default_value' => $final_total_alloc,
+	    '#size' => 20,
+	    '#prefix' => '<div class="job_total_allocated">',
+	    '#attributes' => array('readonly' => 'readonly' , 'id'=>'total_allocated'),
+	    '#suffix' => '</div>',
+    );
+    //echo $final_total." ".$final_total_alloc;
+    
+    if($final_total != $final_total_alloc){
+	$alloc_msg = "Please make sure the invoice total matches the total allocations.";
+	$alloc_class = "alloc_msg";
+    }
+    else  {
+	$alloc_msg = "Please make sure the invoice total matches the total allocations.";
+	$alloc_class = "alloc_msg";
+    }
+    $form['alloc_msg'] = array(
+	  '#markup' => $alloc_msg,
+	  '#prefix' => '<div class="'.$alloc_class.' alloc_msg_print">',
+	  '#suffix' => '</div>'.$previous_button,
+    );
+    $form['counter_'.$allocation] = array(
+      '#type' => 'hidden',
+      '#default_value' => $i,
+      '#attributes' => array('id' => 'counter_'.$allocation)
+    );
+    
+    
+    $form['total_resource_'.$allocation] = array(
+      '#type' => 'hidden',
+      '#default_value' => $final_total_alloc,
+      '#attributes' => array('id' => 'total_resource_'.$allocation),
+    );
+    /******************* End of Job Resource Allocations Form ************************/
+    
+    
+    $form['not_allowed_to_edit_in_future'] = array(
+      '#prefix' => '</div><div class="step_three">',
+      '#type' => 'checkbox',
+      '#title' => t('Generate PDF'),
+      '#default_value' => 1,
+    );
+    
+    $form['send'] = array(
+      '#type' => 'hidden',
+      '#attributes' => array('id' => 'send', 'class' => 'send'),
+      '#default_value' => 1,
+    );
+    
+    $form['submit'] = array(
+      '#prefix' => '<div id="invoice_submit_cont"><div id="invoice_submit">',
+      '#type' => 'submit',
+      '#value' => 'Create',
+      '#name' => 'create',
+      '#suffix' => '</div>',
+    );
+    
+    $form['submit_create_and_send'] = array(
+      '#prefix' => '<div id="invoice_submit">',
+      '#type' => 'submit',
+      '#value' => 'Create and Send',
+      '#name' => 'submit_create_and_send',
+      '#suffix' => '</div>',
+    );
+    
+    $form['actions']['cancel'] = array(
+      '#markup' => l(t('Cancel'), 'user-dashboard'),
+      '#prefix' => '<div class="invoice_cancel">',
+      '#suffix' => '</div></div></div></div>',
+    );
+    
+    return $form;
+  }
+  
+  /***
+  * hook_form_validate
+  ***/
+  function form_invoices_validate($form, &$form_state) {      
+    
+  }
+  
+  /***
+  * hook_submit
+  ***/
+  function form_invoices_submit($form, &$form_state) {
+    GLOBAL $user;    
+    
+    //pre_disp($form_state['values']);
+    //exit();
+    
+    $customer_id = $form_state['values']['customer'];
+    $bill_to = $form_state['values']['bill_to'];
+    $notes = $form_state['values']['notes'];
+    $invoice_date = $form_state['values']['invoice_date'];    
+    $due_date = $form_state['values']['due_date'];
+    $project_manager = $form_state['values']['project_manager'];
+    $i = $form_state['values']['number_of_job'];
+    $job_ids = $form_state['values']['job_ids'];    
+    $not_allowed_to_edit_in_future = $form_state['values']['not_allowed_to_edit_in_future'];
+    
+    $invoice_status = $form_state['values']['invoice_status'];
+    
+    if($invoice_status == ""){
+      if(!empty($_POST['submit_create_and_send'])) {
+	$invoice_status = "1";
+      }
+      elseif(!empty($_POST['create'])) {
+	$invoice_status = "2";
+      }	
+    }
+    $send = $form_state['values']['send'];
+    
+     $i = $i+3;
+    //Save "Bill to Details for invoice" node
+    //$bdi_node = node_load(294);
+    //pre_disp($form_state['values']);
+    //exit();
+    
+    /*****************/
+    $query_inv_no  = "SELECT MAX(field_invoice_no_value) AS invoice_no FROM 
+	      {field_data_field_invoice_no }";	
+    $result_inv_no = returnArrayOfObject($query_inv_no);
+    $invoice_no_val = $result_inv_no[0]->invoice_no;
+    if(empty($invoice_no_val)){
+      $invoice_no_val = 2000;
+    }else{
+      ++$invoice_no_val ;
+    }
+    $node_bill = new stdClass();
+    $node_bill->title = 'invoice-bill_'.time();		
+    $node_bill->type = 'bdi';		
+    $node_bill->language = LANGUAGE_NONE;
+    $node_bill->created = time();
+    $node_bill->uid = $user->uid;
+    
+    node_object_prepare($node_bill); //sets up all the default values
+    
+    $node_bill->field_customer_name['und'][0]['value'] = $customer_id;
+    $node_bill->field_bill_to['und'][0]['value'] = $bill_to;
+    $node_bill->field_notes['und'][0]['value'] = $notes;
+    $node_bill->field_invoice_date['und'][0]['value'] = $invoice_date;    
+    $node_bill->field_invoice_due_date['und'][0]['value'] = $due_date;
+    $node_bill->field_project_manager['und'][0]['value'] = $project_manager;
+    $node_bill->field_not_allow_to_edit_in_futur['und'][0]['value'] = $not_allowed_to_edit_in_future;
+    $node_bill->field_invoice_status['und'][0]['value'] = $invoice_status;
+    $node_bill->field_invoice_no['und'][0]['value'] = $invoice_no_val;
+    
+    node_save($node_bill);
+    
+    /******************/
+    
+   $jd_nid = $node_bill->nid; //Node id for "Bill to Details for invoice"
+    
+    /* Save node for Job Resource Invoice */
+    $counter_alloc = $form_state['values']['counter_alloc'];
+    
+    for($i = 0;$i <= $counter_alloc; $i++)
+    {
+      
+	$job_name = $form_state['values']['job_name_alloc_'.$i];
+	$job_resource = $form_state['values']['job_resource_alloc_'.$i];
+	$role = $form_state['values']['role_alloc_'.$i];
+	$resource_rate = $form_state['values']['rate_alloc_'.$i];
+	$resource_count = $form_state['values']['count_alloc_'.$i];
+	$resource_total = $form_state['values']['total_alloc_'.$i];
+	$job_id = $form_state['values']['job_id_alloc_'.$i];
+	
+    	$node_invoice_resource = new stdClass();
+    	$node_invoice_resource->title = 'invoice-job-resource-'.time();		
+    	$node_invoice_resource->type = 'invoice_job_resource';		
+    	$node_invoice_resource->language = LANGUAGE_NONE;
+    	$node_invoice_resource->created = time();
+    	$node_invoice_resource->uid = $user->uid;
+    
+    	node_object_prepare($node_invoice_resource); //sets up all the default values
+    	
+    	$node_invoice_resource->field_job_name['und'][0]['value'] = $job_name;
+    	$node_invoice_resource->field_job_resource['und'][0]['value'] = $job_resource;
+	$node_invoice_resource->field_role['und'][0]['value'] = $role;
+	$node_invoice_resource->field_resource_rate['und'][0]['value'] = $resource_rate;
+	$node_invoice_resource->field_resource_count['und'][0]['value'] = $resource_count;
+	$node_invoice_resource->field_resource_total['und'][0]['value'] = $resource_total;
+	$node_invoice_resource->field_job_id['und'][0]['value'] = $job_id;
+	$node_invoice_resource->field_invoice_id['und'][0]['nid'] = $jd_nid;
+	
+	node_save($node_invoice_resource);
+    }
+    
+    /* ********************************** */
+    
+    while ($i > 0) {
+      
+      $job_title = trim($form_state['values']["job_title_$i"]);
+      if(trim($job_title) != "")
+      {	
+      $job_node_id = $form_state['values']["job_nid_$i"];
+      	
+      $po_number = $form_state['values']["po_number_$i"];
+      $volume = $form_state['values']["volume_$i"];
+      $rate = $form_state['values']["rate_$i"];
+      $total = $form_state['values']["total_$i"];
+      
+      /*****************/
+      $node_job_details = new stdClass();
+      $node_job_details->title = $job_title;
+      $node_job_details->type = 'job_details_for_invoice';
+      $node_job_details->language = LANGUAGE_NONE;
+      $node_job_details->created = time();
+      $node_job_details->uid = $user->uid;
+      
+      node_object_prepare($node_job_details); //sets up all the default values
+  
+      $node_job_details->field_po_number['und'][0]['value'] = $po_number;
+      $node_job_details->field_count['und'][0]['value'] = $volume;
+      $node_job_details->field_rate['und'][0]['value'] = $rate;
+      $node_job_details->field_total['und'][0]['value'] = $total;
+      $node_job_details->field_for_bill_to['und'][0]['nid'] = $jd_nid;
+      
+      if($job_node_id != "")
+	$node_job_details->field_job['und'][0]['nid'] = $job_node_id;
+      
+      node_save($node_job_details);
+      	
+      /******************/
+      if($job_node_id != "")
+	{
+	
+      /***********creating invoice content for previous flow Dec20***********/
+      $invoice_title = $job_title."-Invoice ";
+      $current_date = date("Y-m-d");
+      $invoice_date = $current_date;
+      
+      $query = "SELECT entity_id FROM 
+	      {field_data_field_job_assigned } 	     
+	      WHERE ((field_job_assigned_nid = '".$job_node_id."') AND (deleted = '0'))";
+      $result = returnArrayOfObject($query);
+      
+      $job_assigned_to =  array();
+      foreach($result AS $key => $values) {
+	  $job_resource_nid = $values->entity_id;
+	  $job_res_array  = node_load($job_resource_nid);
+	  $job_assigned_to[$key]['uid'] = $job_res_array->field_member['und'][0]['uid'];
+      }
+      
+      $node_invoice = new stdClass();
+      $node_invoice->title = $invoice_title;		
+      $node_invoice->type = 'invoice';		
+      $node_invoice->language = LANGUAGE_NONE;
+      $node_invoice->created = time();
+      $node_invoice->log = t('Invoice created: '.$node_invoice->title);
+
+      node_object_prepare($node_invoice); //sets up all the default values
+
+      $node_invoice->field_job['und'][0]['nid'] = $job_node_id;
+      $node_invoice->field_date_of_invoice['und'][0]['value'] = $invoice_date;
+      $node_invoice->field_for_the_user['und'] = $job_assigned_to;
+      $node_invoice->field_amount['und'][0]['value']= $total;      
+      node_save($node_invoice);
+      
+      /********* Update Job node to update status ***********************/
+      $node_job = node_load($job_node_id);
+      $node_job->field_job_status['und'][0]['value']= 5;
+      node_save($node_job);
+	}
+      /****************************************************************/
+      }
+      $i--;
+    }
+    
+    
+    //structure the notification message		  
+    $output = t("A new invoice @name has been added successfully.", array(
+      '@name' => $invoice_title,		      
+    )
+    );
+     
+    drupal_set_message($output);
+    
+    unset($_SESSION['job_nids']);
+    
+    $bill_di_nid = $node_bill->nid;
+    
+    $send_to_email = $form_state['values']['send_to'];
+    if(!empty($_POST['submit_create_and_send'])) {
+      $send = 1;
+    } else {
+      $send = 0;
+    }
+    
+    if(($not_allowed_to_edit_in_future == 1) && ($send == 1)) {
+      $pdfPath = _generate_recommendation_pdf($bill_di_nid, $send, $send_to_email);
+    } else {
+      $pdfPath = _generate_recommendation_pdf($bill_di_nid, 0, $send_to_email);
+    }
+    
+    drupal_goto('user-dashboard');
+  }
+  
+  
+  /********************* Invoice Edit ************************/
+  function form_invoices_edit() {
+    GLOBAL $user;
+    $uid = $user->uid;
+    $user_name = $user->name; 
+    $form = array();
+    
+    $job_nid = arg(1); // Need to decrypt
+    
+    if(!empty($job_nid)) {
+      $job_nids_posted = trim(check_plain($job_nid));
+    } else {
+      drupal_set_message('Please select atleast one Job', 'error');
+      drupal_goto('user-dashboard');
+    }
+    
+    $bill_to_details = node_load($job_nids_posted);
+    
+    //Customer Details
+    $customer_nid = $bill_to_details->field_customer_name['und'][0]['value'];
+    $customer = node_load($customer_nid);
+    $customer_name = $customer->title;
+    $customer_email = $customer->field_email['und'][0]['value'];
+    
+    $bill_to = $bill_to_details->field_bill_to['und'][0]['value'];
+    $field_invoice_date = $bill_to_details->field_invoice_date['und'][0]['value'];
+    $invoice_due_date = $bill_to_details->field_invoice_due_date['und'][0]['value'];
+    $delivery_date = $bill_to_details->field_job_delivery_date['und'][0]['value'];
+    $project_mngr_name = $bill_to_details->field_project_manager['und'][0]['value'];
+    $notes = $bill_to_details->field_notes['und'][0]['value'];
+    $status = $bill_to_details->field_invoice_status['und'][0]['value'];
+    $not_allowed = $bill_to_details->field_not_allow_to_edit_in_futur['und'][0]['value'];
+    
+    $form['customer'] = array(
+      '#type' => 'select',
+      '#title' => t('Customer'),
+      '#required' => true,
+      '#options' => customers_list(),
+      '#attributes' => array('disabled' => 'disabled'),
+      '#default_value' => $customer_nid,
+      '#prefix' => '<div class="step_one"><div class="customers_name">',
+      '#suffix' => "</div>",
+    );
+    
+    $bt = 'bill_to';
+    $form[$bt] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Bill To'),
+      '#collapsible' => TRUE,
+      '#collapsed' => FALSE,
+      '#prefix' => '<div class="second_top"><div class="bill_to_cont">',
+      '#suffix' => '</div>',
+    );
+    
+    $form[$bt]['bill_to'] = array(
+      '#type' => 'textarea',
+      '#default_value' => $bill_to,
+      '#prefix' => '<div class="bill_to_inner"><div class="bill_to">',
+      '#suffix' => "</div>",
+    );
+    
+    $form[$bt]['notes'] = array(
+      '#type' => 'textarea',
+      '#title' => t('Notes'),
+      '#default_value' => $notes,
+      '#prefix' => '<div class="notes_cont">',
+      '#suffix' => "</div>",
+    );
+    $form[$bt]['send_to'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Send To'),
+      '#default_value' => $customer_email,
+      '#prefix' => '<div class="send_to_email">',
+      '#suffix' => "</div>",
+    );
+    
+    $dateformat = 'Y-m-d';
+    $default_value = date('Y-m-d');
+    
+    $form['invoice_date'] = array(
+      '#type' => 'date_popup',
+      '#date_timezone' => date_default_timezone(),
+      '#date_format' => $dateformat,
+      '#date_year_range' => '-3:+3',
+      '#title' => t('Invoice Date'),
+      '#prefix' => '<div class="invoice_right_cont"><div class="invoice_date"> <div class="invoice_date_cont">',
+      '#suffix' => "</div>",
+      '#default_value' => $field_invoice_date,
+    );
+    
+    $form['due_date'] = array(
+      '#type' => 'date_popup',
+      '#date_timezone' => date_default_timezone(),
+      '#date_format' => $dateformat,
+      '#date_year_range' => '-3:+3',
+      '#title' => t('Due Date'),      
+      '#prefix' => '<div class="project_id_cont"><div class="due_date">',
+      '#suffix' => "</div></div>",
+      '#default_value' => $invoice_due_date,
+    );
+    
+    $form['project_manager'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Project Manager'),
+      '#default_value' => $project_mngr_name,
+      '#prefix' => '<div class="project_manager">',
+      '#suffix' => "</div>",
+    );
+    $form['invoice_status'] = array(
+      '#type' => 'select',
+      '#title' => t('Invoice Status'),
+      '#options' => invoice_status(),
+      '#default_value' => $status,
+      '#prefix' => '<div class="invoice_status">',
+      '#suffix' => "</div></div></div></div>",
+    );
+    
+    $job_contents = '';
+    $job_contents .= '<div class="job_cont">';
+    $job_contents .= '<div class="job_row table_header">
+    
+			  <div class="job_desc">
+			    Description
+			  </div>
+			  
+			  <div class="po_number">
+			    PO Number
+			  </div>
+			  
+			  <div class="job_volume">
+			    Volume
+			  </div>			  
+			  
+			  <div class="job_rate">
+			    Rate
+			  </div>
+			  
+			  <div class="job_total">
+			    Total
+			  </div>
+			
+		      </div>';
+    
+    $i = 0; 
+    $jif = 'job_invoice_form';
+    $form[$jif] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Job Invoice'),
+      '#collapsible' => TRUE,
+      '#collapsed' => FALSE,
+      '#prefix' => $job_contents,
+      '#suffix' => '</div>',
+    );
+
+    $query = "SELECT node.nid AS nid, node.created AS node_created
+	      FROM 
+	      {node} node
+	      LEFT JOIN {field_data_field_for_bill_to} field_data_field_for_bill_to ON node.nid = field_data_field_for_bill_to.entity_id AND (field_data_field_for_bill_to.entity_type = 'node' AND field_data_field_for_bill_to.deleted = '0')
+	      WHERE (( (node.status = '1') AND (node.type IN  ('job_details_for_invoice')) AND (field_data_field_for_bill_to.field_for_bill_to_nid IN  ('$job_nids_posted')) ))
+	      ORDER BY node_created DESC";
+    $result = returnArrayOfObject($query);
+ 
+    $final_total = 0; 
+    foreach($result AS $jnid) {
+      $i++;
+      $node_job =  node_load($jnid->nid);
+      
+      $final_count = $node_job->field_count['und'][0]['value'];
+      $po_number = $node_job->field_po_number['und'][0]['value'];
+      $rate = $node_job->field_rate['und'][0]['value'];
+      $job_nid_ref = $node_job->field_job['und'][0]['nid'];
+	$delivery_date = $node_job->field_delivery_date['und'][0]['value'];
+      
+      if(empty($final_count)) {
+	$final_count = 0;
+      }
+      
+      if(empty($po_number)) {
+	$po_number = 0;
+      }
+      
+      if(empty($rate)) {
+	$rate = 0;
+      }
+      
+      $total_amount = $final_count * $rate;
+      $total = number_format($total_amount,2,'.','');
+      $final_total += $total; 
+
+	if($delivery_date != "")
+      {
+	$d_arr = explode(" ", $delivery_date);
+	$d_dt_arr = explode("-", $d_arr[0]);			
+
+	$d_date = 'Delivered Date:'.$d_dt_arr[1]."-".$d_dt_arr[2].'-'.$d_dt_arr[0];
+      }	 
+      else 
+      {
+	$d_date = "";
+      }	  
+      
+      $form[$jif]['job_title_'.$i] = array(
+	'#type' => 'textfield',
+	'#default_value' => $d_date." ".$node_job->title,
+	'#prefix' => '<div class="job_row table_input"><div class="job_desc">',
+	'#suffix' => '</div>',
+      );
+      
+      $form[$jif]['po_number_'.$i] = array(
+	'#type' => 'textfield',
+	'#title' => t('PO Number'),
+	'#default_value' => $po_number,
+	'#required' => true,
+	'#prefix' => '<div class="po_number">',
+	'#suffix' => "</div>",
+      );
+      
+      $form[$jif]['volume_'.$i] = array(
+	'#type' => 'textfield',
+	'#title' => t('Volume'),
+	'#default_value' => $final_count,
+	'#required' => true,
+	'#prefix' => '<div class="job_volume">',
+	'#attributes' => array('onfocus' => "return changeJobPrice('job')", 'onblur' => "return changeJobPrice('job')" ),
+	'#suffix' => '</div>',
+      );
+      
+      $form[$jif]['rate_'.$i] = array(
+	'#type' => 'textfield',
+	'#title' => t('Rate'),
+	'#default_value' => $rate,
+	'#required' => true,
+	'#prefix' => '<div class="job_rate">',
+	'#attributes' => array('onfocus' => "return changeJobPrice('job')", 'onblur' => "return changeJobPrice('job')" ),
+	'#suffix' => '</div>',
+      );
+      
+      $form[$jif]['total_'.$i] = array(
+	'#type' => 'textfield',
+	'#title' => t('Total'),
+	'#default_value' => $total,
+	'#required' => true,
+	'#prefix' => '<div class="job_total">',
+	'#attributes' => array('onkeyup' => "return changeJobPrice('job')"),
+	'#suffix' => '</div></div>',
+      );
+      
+      $form[$jif]['job_di_nid_'.$i] = array(
+	'#type' => 'hidden',
+	'#default_value' => $jnid->nid,
+      );
+      
+      $form['job_nid_'.$i] = array(
+	'#type' => 'hidden',
+	'#default_value' => $job_nid_ref,
+      );
+      
+    }
+    
+    $form['total_job_price'] = array(
+      '#type' => 'hidden',
+      '#default_value' => number_format($final_total,2,'.',''),
+      '#attributes' => array('id' => 'total_job_price')
+    );
+    for($j = $i+1; $j < $i+4; $j++)
+    {
+    	$form[$jif]['job_title_'.$j] = array(
+	'#type' => 'textfield',
+	'#default_value' => '',
+	'#prefix' => '<div class="job_row table_input"><div class="job_desc">',
+	'#suffix' => '</div>',
+      );
+      
+      $form[$jif]['po_number_'.$j] = array(
+	'#type' => 'textfield',
+	'#title' => t('PO Number'),
+	'#default_value' => '',
+	//'#required' => true,
+	'#prefix' => '<div class="po_number">',
+	'#suffix' => "</div>",
+      );
+      
+      $form[$jif]['volume_'.$j] = array(
+	'#type' => 'textfield',
+	'#title' => t('Volume'),
+	'#default_value' => '0',
+	//'#required' => true,
+	'#prefix' => '<div class="job_volume">',
+	'#attributes' => array('onfocus' => "return changeJobPrice('job')", 'onblur' => "return changeJobPrice('job')" ),
+	'#suffix' => '</div>',
+      );
+      
+      $form[$jif]['rate_'.$j] = array(
+	'#type' => 'textfield',
+	'#title' => t('Rate'),
+	'#default_value' => '0',
+	//'#required' => true,
+	'#prefix' => '<div class="job_rate">',
+	'#attributes' => array('onfocus' => "return changeJobPrice('job')", 'onblur' => "return changeJobPrice('job')" ),
+	'#suffix' => '</div>',
+      );
+      
+      $form[$jif]['total_'.$j] = array(
+	'#type' => 'textfield',
+	'#title' => t('Total'),
+	'#default_value' => '0.00',
+	//'#required' => true,
+	'#prefix' => '<div class="job_total">',
+	'#attributes' => array('onkeyup' => "return changeJobPrice('job')"),
+	'#suffix' => '</div></div>',
+      );
+	$form['job_nid_'.$j] = array(
+	'#type' => 'hidden',
+	'#default_value' => '',
+      );
+    }	
+    $form['number_of_job'] = array(
+      '#type' => 'hidden',
+      '#default_value' => $i,
+      '#attributes' => array('id' => 'number_of_job'),
+    );
+    
+    $form['bill_di_nid'] = array(
+      '#type' => 'hidden',
+      '#default_value' => $job_nids_posted,
+    );
+    
+        
+    /******For allocation******/
+    $next_button = '<div class="next_step"><input class="next_step_button form-submit" type="button" name="next_step" id="next_step" value="Next" /></div>';
+    $form['next_button'] = array(
+      
+      //'#prefix' => '<div class="invoice_status">',
+      '#suffix' => $next_button."</div>",
+    );
+    
+    /*$form['invoice_status'] = array(
+      '#type' => 'select',
+      '#title' => t('Invoice Status'),
+      '#required' => true,
+      '#options' => invoice_status(),
+      '#prefix' => '<div class="invoice_status">',
+      '#suffix' => $next_button."</div></div>",
+    );*/
+    
+    /******************* Job Resource Allocations Form ************************/
+    
+    $job_allocations .= '<div class="job_alloc table_header">
+    
+			  <div class="job_name">
+			    Job
+			  </div>
+			  
+			  <div class="job_resource">
+			    Job Resource
+			  </div>
+			  
+			  <div class="role">
+			    Role
+			  </div>			  
+			  
+			  <div class="job_rate">
+			    Rate
+			  </div>
+			  
+			  <div class="job_count">
+			    Count
+			  </div>
+			  
+			  <div class="job_total">
+			    Total
+			  </div>
+			
+		      </div>';
+    
+    
+    $jrf = 'job_resource_form';
+    $previous_button = '<div class="prev_step"><input class="prev_step_button form-submit" type="button" name="prev_step" id="prev_step" value="Back" /></div>';
+    $form[$jrf] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Job Resource'),
+      '#collapsible' => TRUE,
+      '#collapsed' => FALSE,
+      '#prefix' => '<div class="step_two"><div class="job_resource_invoice_cont">'.$job_allocations,
+      '#suffix' => '',
+    );
+    
+    $i = 0;
+    $final_total_tz_val = 0;
+    $final_total_val = 0;
+    $allocation = 'alloc';
+     $query = "SELECT node.nid AS nid, node.created AS node_created
+	      FROM 
+	      {node} node
+	      LEFT JOIN {field_data_field_invoice_id} field_data_field_invoice_id ON node.nid = field_data_field_invoice_id.entity_id AND (field_data_field_invoice_id.entity_type = 'node' AND field_data_field_invoice_id.deleted = '0')
+	      WHERE (( (node.status = '1') AND (node.type IN  ('invoice_job_resource')) AND (field_data_field_invoice_id.field_invoice_id_nid IN  ('$job_nid')) ))
+	      ORDER BY node_created DESC";
+    $result = returnArrayOfObject($query);
+    
+	
+	ksort($result);
+	$count_res =  count($result);
+	$i = 0;
+	foreach($result AS $jr) {
+	  $jr_nid = $jr->nid; // Job Resource Nid
+	  $resource_node = node_load($jr_nid);
+	  //pre_disp($resource_node);
+	  
+	  $job_name = $resource_node->field_job_name['und'][0]['value'];
+	  $job_resource = $resource_node->field_job_resource['und'][0]['value'];
+	  $role = $resource_node->field_role['und'][0]['value'];
+	  $rate = $resource_node->field_resource_rate['und'][0]['value'];
+	  $count = $resource_node->field_resource_count['und'][0]['value'];
+	  $total_value = $resource_node->field_resource_total['und'][0]['value'];
+	  $job_id = $resource_node->field_job_id['und'][0]['value'];
+	  $invoice_id = $resource_node->field_invoice_id['und'][0]['nid'];
+	  
+	  //$rate_value = $resource_node->field_rate['und'][0]['value'];
+	 // $count = $resource_node->field_count['und'][0]['value'];
+	  //$total_value = $rate_value * $count;
+	  $all_total += $total_value;
+	  
+	  //$total_val = $total_value - ($total_value * 0.05);
+	  $total_val = number_format($total_value,2,'.','');
+	  $final_total_val += $total_val;
+	  //echo $i." ".($count-1)."<br>";
+	  $temp = strtolower($job_resource);
+	  if($temp == 'tz'){	    
+	    $readonly_class = 'readonly_class';
+	  }
+	  else
+	  {
+	    $readonly_class = "";
+	  }
+	  $form[$jrf]['job_name_'.$allocation.'_'.$i] = array(
+	    '#type' => 'textfield',
+	    '#default_value' => $job_name,
+	    '#size' => 20,
+	    '#prefix' => '<div class="job_resource_container"><div class="job_name">',
+	    '#attributes' => array('readonly' => 'readonly'),
+	    '#suffix' => '</div>',
+	  );
+	  
+	  $form[$jrf]['job_resource_'.$allocation.'_'.$i] = array(
+	    '#type' => 'textfield',
+	    '#default_value' => $job_resource,
+	    '#size' => 20,
+	    '#prefix' => '<div class="job_resource">',
+	    '#attributes' => array('readonly' => 'readonly'),
+	    '#suffix' => '</div>',
+	  );
+	  
+	  $form[$jrf]['role_'.$allocation.'_'.$i] = array(
+	    '#type' => 'textfield',
+	    '#default_value' => $role,
+	    '#size' => 20,
+	    '#prefix' => '<div class="job_role">',
+	    '#attributes' => array('readonly' => 'readonly'),
+	    '#suffix' => '</div>',
+	  );
+	  
+	  $form[$jrf]['rate_'.$allocation.'_'.$i] = array(
+	    '#type' => 'textfield',
+	    '#default_value' => $rate,
+	    '#size' => 20,
+	    '#prefix' => '<div class="job_rate '.$readonly_class.'">',
+	    '#suffix' => '</div>',
+	  );
+	  
+	  $form[$jrf]['count_'.$allocation.'_'.$i] = array(
+	    '#type' => 'textfield',
+	    '#default_value' => $count,
+	    '#size' => 20,
+	    '#prefix' => '<div class="job_count '.$readonly_class.'">',
+	    '#suffix' => '</div>',
+	  );
+	  
+	  $form[$jrf]['total_'.$allocation.'_'.$i] = array(
+	    '#type' => 'textfield',
+	    '#default_value' => $total_value,
+	    '#size' => 20,
+	    '#prefix' => '<div class="job_total '.$readonly_class.'">',
+	    '#attributes' => array('onkeyup' => "return changeJobPrice('job_resource')", ),
+	    '#suffix' => '</div></div>',
+	  );
+	  $form[$jrf]['job_id_'.$allocation.'_'.$i] = array(
+	  '#type' => 'hidden',
+	  '#default_value' => $job_id,
+	  '#size' => 20,
+	);
+	  $form['invoice_id_'.$allocation.'_'.$i] = array(
+	    '#type' => 'hidden',
+	    '#default_value' => $jr_nid,
+      
+	  );
+	  $i++;	  
+	}
+	
+	
+	
+	
+
+    $final_total = number_format($final_total,2,'.','');
+    $form['tatal_invoice'] = array(
+	    '#type' => 'textfield',
+	    '#title' => t('Total Invoice'),
+	    '#default_value' => $final_total,
+	    '#size' => 20,
+	    '#prefix' => '<div class="job_total_invoice">',
+	    '#attributes' => array('readonly' => 'readonly', 'id'=>'total_invoice'),
+	    '#suffix' => '</div>',
+    );
+    $final_total_alloc = number_format($final_total_val,2,'.','');
+    $form['tatal_allocated'] = array(
+	    '#type' => 'textfield',
+	    '#title' => t('Total Allocated'),
+	    '#default_value' => $final_total_alloc,
+	    '#size' => 20,
+	    '#prefix' => '<div class="job_total_allocated">',
+	    '#attributes' => array('readonly' => 'readonly' , 'id'=>'total_allocated'),
+	    '#suffix' => '</div>',
+    );
+    if($final_total != $final_total_alloc){
+	$alloc_msg = "Please make sure the invoice total matches the total allocations.";
+	$alloc_class = "alloc_msg";
+    }
+    else  {
+	$alloc_msg = "Please make sure the invoice total matches the total allocations.";
+	$alloc_class = "alloc_msg";
+    }
+    $form['alloc_msg'] = array(
+	  '#markup' => $alloc_msg,
+	  '#prefix' => '<div class="'.$alloc_class.' alloc_msg_print">',
+	  '#suffix' => '</div>'.$previous_button,
+  );
+    
+    $form['counter_'.$allocation] = array(
+      '#type' => 'hidden',
+      '#default_value' => $i-1,
+      '#attributes' => array('id' => 'counter_'.$allocation)
+    );
+    
+    
+    $form['total_resource_'.$allocation] = array(
+      '#type' => 'hidden',
+      '#default_value' => $final_total_alloc,
+      '#attributes' => array('id' => 'total_resource_'.$allocation),
+    );
+    
+    
+    /******************* End of Job Resource Allocations Form ************************/
+    
+    /******End of "For allocation" ******/
+    
+    
+    $form['not_allowed_to_edit_in_future'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Generate PDF'),
+      '#default_value' => 1,
+    );
+    
+    $form['send'] = array(
+      '#type' => 'hidden',
+      '#attributes' => array('id' => 'send', 'class' => 'send'),
+      '#default_value' => $send,
+    );
+    
+    $form['submit'] = array(
+      '#prefix' => '</div><div id="invoice_submit_cont"><div id="invoice_submit">',
+      '#type' => 'submit',
+      '#value' => 'Update',
+      '#name' => 'create',
+      '#suffix' => '</div>',
+    );
+    
+    $form['submit_create_and_send'] = array(
+      '#prefix' => '<div id="invoice_submit">',
+      '#type' => 'submit',
+      '#value' => 'Update and Send',
+      '#name' => 'submit_create_and_send',
+      '#suffix' => '</div>',
+    );
+    
+    $form['actions']['cancel'] = array(
+      '#markup' => l(t('Cancel'), 'user-dashboard'),
+      '#prefix' => '<div class="invoice_cancel">',
+      '#suffix' => '</div></div>',
+    );
+    
+    return $form; 
+  }
+  
+  /***
+  ** hook_submit()
+  ***/
+  function form_invoices_edit_submit($form, &$form_state) {
+    GLOBAL $user;
+    
+    //pre_disp($form_state['values']);
+    //exit();
+    
+    $bill_di_nid = $form_state['values']['bill_di_nid'];
+    $customer_id = $form_state['values']['customer'];
+    $bill_to = $form_state['values']['bill_to'];
+    $notes = $form_state['values']['notes'];
+    $invoice_date = $form_state['values']['invoice_date'];    
+    $due_date = $form_state['values']['due_date'];
+    $delivery_date = $form_state['values']['delivery_date'];
+    $project_manager = $form_state['values']['project_manager'];
+    $i = $form_state['values']['number_of_job'];
+    $job_ids = $form_state['values']['job_ids'];
+    $not_allowed_to_edit_in_future = $form_state['values']['not_allowed_to_edit_in_future'];
+    $invoice_status = $form_state['values']['invoice_status'];
+    $send = $form_state['values']['send'];
+    
+    $i = $i+3;	
+    /******** Bill details *********/
+    $node_bill = node_load($bill_di_nid);
+    
+    $invoice_title = $node_bill->title;
+    $node_bill->uid = $user->uid;
+    
+    $node_bill->field_bill_to['und'][0]['value'] = $bill_to;
+    $node_bill->field_notes['und'][0]['value'] = $notes;
+    $node_bill->field_invoice_date['und'][0]['value'] = $invoice_date;    
+    $node_bill->field_invoice_due_date['und'][0]['value'] = $due_date;
+    $node_bill->field_job_delivery_date['und'][0]['value'] = $delivery_date;
+    $node_bill->field_project_manager['und'][0]['value'] = $project_manager;
+    $node_bill->field_not_allow_to_edit_in_futur['und'][0]['value'] = $not_allowed_to_edit_in_future;
+    $node_bill->field_invoice_status['und'][0]['value'] = $invoice_status;    
+    
+    node_save($node_bill);
+    
+    /******** End of Bill details *********/
+    
+    $jd_nid = $node_bill->nid; //Node id for "Bill to Details for invoice"
+    
+    
+    /* Save node for Job Resource Invoice */
+   $counter_alloc = $form_state['values']['counter_alloc'];
+    
+    for($j = 0;$j <= $counter_alloc; $j++)
+    {
+      
+	$job_name = $form_state['values']['job_name_alloc_'.$j];
+	$job_resource = $form_state['values']['job_resource_alloc_'.$j];
+	$role = $form_state['values']['role_alloc_'.$j];
+	$resource_rate = $form_state['values']['rate_alloc_'.$j];
+	$resource_count = $form_state['values']['count_alloc_'.$j];
+	$resource_total = $form_state['values']['total_alloc_'.$j];
+	$invoice_id = $form_state['values']['invoice_id_alloc_'.$j];
+	//$job_id = $form_state['values']['job_id_alloc_'.$i];
+	
+    	//$node_invoice_resource = new stdClass();
+    	//$node_invoice_resource->title = 'invoice-job-resource-'.time();		
+    	//$node_invoice_resource->type = 'invoice_job_resource';		
+    	//$node_invoice_resource->language = LANGUAGE_NONE;
+    	//$node_invoice_resource->created = time();
+	$node_invoice_resource = node_load($invoice_id);
+	
+    	$node_invoice_resource->uid = $user->uid;
+    
+    	//node_object_prepare($node_invoice_resource); //sets up all the default values
+	
+    	//$node_invoice_resource->field_invoice_id['und'][0]['nid'] = $invoice_id;
+    	$node_invoice_resource->field_job_name['und'][0]['value'] = $job_name;
+    	$node_invoice_resource->field_job_resource['und'][0]['value'] = $job_resource;
+	$node_invoice_resource->field_role['und'][0]['value'] = $role;
+	$node_invoice_resource->field_resource_rate['und'][0]['value'] = $resource_rate;
+	$node_invoice_resource->field_resource_count['und'][0]['value'] = $resource_count;
+	$node_invoice_resource->field_resource_total['und'][0]['value'] = $resource_total;
+	//$node_invoice_resource->field_job_id['und'][0]['value'] = $job_id;
+	//$node_invoice_resource->field_invoice_id['und'][0]['nid'] = $jd_nid;
+	
+	node_save($node_invoice_resource);
+    }
+    
+    while ($i > 0) {
+      
+      $job_node_id = $form_state['values']["job_nid_$i"];
+      $node_job_details_nid = $form_state['values']["job_di_nid_$i"];
+      $job_title = trim($form_state['values']["job_title_$i"]);
+
+      if(trim($job_title) != "")
+      {
+      $po_number = $form_state['values']["po_number_$i"];
+      $volume = $form_state['values']["volume_$i"];
+      $rate = $form_state['values']["rate_$i"];
+      $total = $form_state['values']["total_$i"];
+      
+      /******** Job details *********/
+      if($node_job_details_nid!="")
+      {
+      $node_job_details = node_load($node_job_details_nid);
+      $node_job_details->uid = $user->uid;
+      
+      $node_job_details->title = $job_title;
+      $node_job_details->field_po_number['und'][0]['value'] = $po_number;
+      $node_job_details->field_count['und'][0]['value'] = $volume;
+      $node_job_details->field_rate['und'][0]['value'] = $rate;
+      $node_job_details->field_total['und'][0]['value'] = $total;
+      $node_job_details->field_for_bill_to['und'][0]['nid'] = $jd_nid;
+      
+      node_save($node_job_details);
+      }
+      else 
+      {
+      	$node_job_details = new stdClass();
+     	$node_job_details->title = $job_title;
+      	$node_job_details->type = 'job_details_for_invoice';
+      	$node_job_details->language = LANGUAGE_NONE;
+      	$node_job_details->created = time();
+      	$node_job_details->uid = $user->uid;
+      
+      	node_object_prepare($node_job_details); //sets up all the default values
+  
+      	$node_job_details->field_po_number['und'][0]['value'] = $po_number;
+      	$node_job_details->field_count['und'][0]['value'] = $volume;
+      	$node_job_details->field_rate['und'][0]['value'] = $rate;
+      	$node_job_details->field_total['und'][0]['value'] = $total;
+      	$node_job_details->field_for_bill_to['und'][0]['nid'] = $jd_nid;
+      
+      	if($job_node_id != "")
+		$node_job_details->field_job['und'][0]['nid'] = $job_node_id;
+      	//echo "<pre>";
+	//print_r($node_job_details);
+      	node_save($node_job_details);
+      }			
+      
+      /******** End of Job details *********/
+      
+      if($job_node_id != "")
+      {	
+      /***********creating invoice content for previous flow Dec20***********/
+      $invoice_title = $job_title."-Invoice ";
+      $current_date = date("Y-m-d");
+      $invoice_date = $current_date;
+      
+      $query = "SELECT entity_id FROM 
+	      {field_data_field_job_assigned } 	     
+	      WHERE ((field_job_assigned_nid = '".$job_node_id."') AND (deleted = '0'))";
+      $result = returnArrayOfObject($query);
+      
+      $job_assigned_to =  array();
+      foreach($result AS $key => $values) {
+	  $job_resource_nid = $values->entity_id;
+	  $job_res_array  = node_load($job_resource_nid);
+	  $job_assigned_to[$key]['uid'] = $job_res_array->field_member['und'][0]['uid'];
+      }
+      
+      $node_invoice = new stdClass();
+      $node_invoice->title = $invoice_title;		
+      $node_invoice->type = 'invoice';		
+      $node_invoice->language = LANGUAGE_NONE;
+      $node_invoice->created = time();
+      $node_invoice->log = t('Invoice created: '.$node_invoice->title);
+
+      node_object_prepare($node_invoice); //sets up all the default values
+
+      $node_invoice->field_job['und'][0]['nid'] = $job_node_id;
+      $node_invoice->field_date_of_invoice['und'][0]['value'] = $invoice_date;
+      $node_invoice->field_for_the_user['und'] = $job_assigned_to;
+      $node_invoice->field_amount['und'][0]['value']= $total;      
+      node_save($node_invoice);
+      
+      /********* Update Job node to update status ***********************/
+      $node_job = node_load($job_node_id);
+      $node_job->field_job_status['und'][0]['value']= 5;
+      node_save($node_job);
+      /****************************************************************/      
+      }	
+      }
+      $i--;
+    }
+    
+    //structure the notification message		  
+    $output = t("Invoice @name has been added successfully.", array(
+      '@name' => $invoice_title,		      
+    )
+    );
+    
+    drupal_set_message($output);
+    
+    unset($_SESSION['job_nids']);
+    
+    if(!empty($_POST['submit_create_and_send'])) {
+      $send = 1;
+    } else {
+      $send = 0;
+    }
+    
+    if(($not_allowed_to_edit_in_future == 1) && ($send == 1)) {
+      $pdfPath = _generate_recommendation_pdf($bill_di_nid, $send);
+    } else {
+      $pdfPath = _generate_recommendation_pdf($bill_di_nid, 0);
+    }
+    
+    drupal_goto('user-dashboard');
+    
+  }
+  
+  /****************** End of *******************/
+  
+  /***************** 	Customers  *******************/
+  function customers_list(){
+    $query = "SELECT node.title AS node_title, node.nid AS nid, node.created AS node_created
+	      FROM 
+	      {node} node
+	      WHERE (( (node.status = '1') AND (node.type IN  ('customer')) ))
+	      ORDER BY node_created DESC";
+    $result = returnArrayOfObject($query);
+    $options = array();
+    foreach($result AS $customsers){
+      $options[$customsers->nid] = $customsers->node_title;
+    }
+    
+    return $options;
+  }
+  
+  /***************** 	Job Status  *******************/
+  function invoice_status() {
+    $options[''] = 'Select';
+    $options[1] = 'Sent';
+    $options[2] = 'Pending';
+    $options[3] = 'Paid';
+    $options[4] = 'Voided';
+    $options[5] = 'Not Yet Sent';
+    return $options;
+  }

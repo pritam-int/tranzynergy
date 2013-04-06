@@ -1,0 +1,1046 @@
+<?php
+    /***
+    * hook_init
+    ***/
+    function form_job_init() {
+      drupal_add_js(drupal_get_path('module', 'form_job') .'/js/jquery.validate.js');
+      drupal_add_js(drupal_get_path('module', 'form_job') .'/js/form_job.js');
+      drupal_add_css(drupal_get_path('module', 'form_job') .'/css/form_job.css');
+
+      drupal_add_js(array(
+	'my-modal-style' => array(
+		'modalSize' => array(
+			'type' => 'fixed',
+			'width' => 700,
+			'height' => 500,
+			),
+		      ),
+		  ), 'setting');
+    }
+    
+    /**	* Implementation of hook_permission().
+	*/
+	function form_job_permission() {
+	  // Restrict access to either of your new URLs.
+	  return array(
+	    'access job page' => array(
+	      'title' => t('Access job page'),
+	      'description' => t('Allow users to access job page'),
+	    ),
+	  );
+	}
+	   
+    
+    /***
+    * hook_menu
+    ***/
+    function form_job_menu() {        
+            $items = array();            
+            $items['add_job'] = array(
+		'title' => 'Add Job',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('form_jobs'),
+		'access arguments' => array('access job page'),
+		'access callback' => 'user_access',
+		'type' => MENU_NORMAL_ITEM,
+            ); 
+	    
+	    $items['edit_job/%'] = array(
+		'title' => t('Edit Job'),
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('create_job_edit', 1),
+		'access arguments' => array('access job page'),
+		'access callback' => 'user_access',
+		'type' => MENU_CALLBACK,
+	    );
+
+            return $items;
+    }
+    
+    /***
+    * function to create add job form
+    ***/
+    function form_jobs() {
+    	unset($_SESSION['resource_title']);
+	GLOBAL $user;
+	$uid = $user->uid;
+	$user_name = $user->name;
+      
+	ctools_include('modal');
+	ctools_include('ajax');
+	ctools_modal_add_js();
+	
+	//prepare customer dropdown
+	$result_customer = db_select('node', 'n')
+	->fields('n', array('nid','title'))
+	->condition('type', 'customer','=')
+	->execute();
+
+	$cust_options=array();
+	$cust_options[''] = '-Choose Customer-';
+	while($arr_customer = $result_customer->fetchAssoc()){
+	  $cust_options[$arr_customer['nid']] = $arr_customer['title'];
+	}
+	
+	//prepare project dropdown
+	$result_project = db_select('node', 'n')
+	  ->fields('n', array('nid','title'))
+	  ->condition('type', 'project','=')
+	  ->execute();
+
+        $proj_options=array();
+	$proj_options[''] = '-Choose Project-';
+	while($arr_project = $result_project->fetchAssoc()){
+	  $proj_options[$arr_project['nid']] = $arr_project['title'];
+	}
+	
+	//prepare user dropdown with project manager role(rid=7)
+	$query_users_pm = db_select('users', 'u');
+	$query_users_pm->join('users_roles', 'ur', 'u.uid = ur.uid');
+	$query_users_pm->fields('u', array('uid','name'))
+			->condition('ur.rid',7,'=');
+	$result_users_pm = $query_users_pm->execute();
+
+	$user_pm_options=array();
+	
+	while($arr_users_pm = $result_users_pm->fetchAssoc()){	
+		$user_pm_options[$arr_users_pm['uid']] = $arr_users_pm['name'];
+	}
+	
+	//Job Resources
+	$query = "SELECT node.title AS node_title, node.nid AS nid, node.created AS node_created
+		    FROM 
+		    {node} node
+		    WHERE (( (node.nid IN  (SELECT tn.nid AS nid
+		    FROM 
+		    {taxonomy_index} tn
+		    WHERE ( (tn.tid = 3) ))) )AND(( (node.status = 1) AND (node.type IN  ('job_resource')) )))
+		    ORDER BY node_created DESC";	
+	$result = returnArrayOfObject($query);	
+	foreach($result AS $values) {
+	  $job_resources_translator[$values->nid] = $values->node_title;
+	}
+	
+	$query = "SELECT node.title AS node_title, node.nid AS nid, node.created AS node_created
+		    FROM 
+		    {node} node
+		    WHERE (( (node.nid IN  (SELECT tn.nid AS nid
+		    FROM 
+		    {taxonomy_index} tn
+		    WHERE ( (tn.tid = 4) ))) )AND(( (node.status = 1) AND (node.type IN  ('job_resource')) )))
+		    ORDER BY node_created DESC";	
+	$result = returnArrayOfObject($query);	
+	foreach($result AS $values) {
+	  $job_resources_editor[$values->nid] = $values->node_title;
+	}	
+	//End of Job Resources
+	
+        $form = array();
+	$form['#attributes'] = array('enctype' => "multipart/form-data");
+	
+	$form['job_title'] = array(
+	  '#type' => 'textfield',
+	  '#title' => t('Job Name'),
+	  '#default_value' => '',
+	  '#size' => 20,
+	);
+	
+	$form['customer'] = array(
+	   '#type' => 'select',
+           '#title' => t('Customer'),
+	   '#required' => true,
+	   '#prefix' => '<div class="form_field_customer">',
+	   '#options' => $cust_options,
+	   '#default_value' => '',
+	   '#suffix' => "<div class='resource_link'>".ctools_modal_text_button(t('Add Customer'), 'add_customer_ajax', t('Add Customer'), 'ctools-modal-my-modal-style')."</div></div>",
+	);
+	
+	$form['project'] = array(
+	   '#type' => 'select',
+           '#title' => t('Project'),
+	   '#required' => true,
+	   '#prefix' => '<div class="form_field_project">',
+	   '#options' => $proj_options,
+	   '#default_value' => '',
+	   '#suffix' => "<div class='resource_link'>".ctools_modal_text_button(t('Add Project'), 'add_project_ajax', t('Add Project'), 'ctools-modal-my-modal-style')."</div></div>",
+	);
+	
+	$form['estimated_word_count'] = array(
+	  '#type' => 'textfield',
+	  '#title' => t('Estimated Word Count'),
+	  '#default_value' => '',
+	  '#size' => 20,
+	);
+	
+	$form['rate'] = array(
+	  '#type' => 'textfield',
+	  '#title' => t('Rate'),
+	  '#default_value' => '',
+	  '#size' => 20,
+	);
+
+	$form['po_number'] = array(
+	  '#type' => 'textfield',
+	  '#title' => t('PO/Customer Number'),
+	  '#default_value' => '',
+	  '#size' => 20,
+	);
+	/**** Job Resource Form start here ***/	
+	//prepare user dropdown	
+	/*$users = entity_load('user');
+	$user_options=array();
+	$user_options[''] = '';
+	foreach($users as $key => $val){
+	  foreach($val->roles AS $key2=>$val2){
+	    if($key2==13){
+	      $user_options[$val->uid] = $val->name;
+	    }
+	  }
+	} */
+	
+	$user_options = all_users();
+	
+	//prepare jobs dropdown
+	$result_job = db_select('node', 'n')
+	->fields('n', array('nid','title'))
+	->condition('type', 'job','=')
+	->execute();
+	
+	$job_options=array();	
+	while($arr_job = $result_job->fetchAssoc()){
+	  $job_options[$arr_job['nid']] = $arr_job['title'];
+	}
+	
+	$result_term = db_select('taxonomy_term_data', 'n')
+		    ->fields('n', array('tid','name'))
+		    ->condition('vid', '4','=')
+		    ->execute();
+	
+	$term_options=array();    
+	while($arr_term = $result_term->fetchAssoc()){
+	  $term_options[$arr_term['tid']] = $arr_term['name'];
+	}
+	
+	$i = 0; 
+	$jrf = 'job_resource_form';
+	$form[$jrf] = array(
+	  '#type' => 'fieldset',
+	  '#title' => t('Job Resource'),
+	  '#collapsible' => TRUE,
+	  '#collapsed' => FALSE,
+	  '#prefix' => '<div class="job_resource_cont">',
+	);
+	
+	$form[$jrf]['add_more_container_start'] = array(
+	      '#prefix' => '<div id="add_more_container_div">',
+	);
+	$image_path = drupal_get_path('module', 'form_job').'/image/minus-1.png';
+	while($i < 3) {
+	    if($i == 0) {
+	      $extra_class = 'first_container';
+	    } else if($i == ($result_counter - 1)) {
+	      //$extra_class = 'last_container';	      
+	      $extra_class = 'inner_container';
+	    } else {
+	      $extra_class = 'inner_container';
+	    }
+	    
+	    switch($i) {
+	      case '0': //Finder
+		$job_type_default_value = 5;
+		$work_done = $uid;
+		break;
+	      
+	      case '1': //Translation
+		$job_type_default_value = '3';
+		$work_done = $uid;
+		break;
+	      
+	      case '2': //Project Manager
+		$job_type_default_value = '7';
+		$work_done = $uid;
+		break;
+	      
+	      case '3': //Editing
+		$job_type_default_value = '4';
+		$work_done = '';
+		break;
+	      
+	      case '4': //Proofreader
+		$job_type_default_value = '6';
+		$work_done = '';
+		break;
+	      
+	      default: 
+		$job_type_default_value = '';
+		$work_done = '';
+		break;
+	    }
+	    
+	    if($i != 0) {	
+		 $form[$jrf]['job_resource_minus_'.$i] = array(
+		 	//'#markup' => l(theme_image(array('path' => $image_path)),'', array('attributes' => array('onclick' => "return delResource($i)"))),
+		 	'#markup' => theme_image(array('path' => $image_path,'attributes' => array('onclick' => "return delResource($i)"))),
+		 	'#prefix' => '<div class="job_resource_container '.$extra_class.'" id="job_resource_'.$i.'">',
+	      
+	  	 );			    
+	   	$prefix = "";
+	    }
+	    else{
+	    	
+	    	$prefix = '<div class="job_resource_container '.$extra_class.'">';
+	    }		
+	    
+	    $form[$jrf]['job_type_'.$i] = array(
+	      '#type' => 'select',
+	      '#title' => t('Job Type'),
+	      '#required' => true,
+	      '#options' => $term_options,
+	      '#default_value' => $job_type_default_value,
+	      //'#prefix' => '<div class="job_resource_container '.$extra_class.'">',
+		'#prefix' => $prefix
+	    );
+	
+	    $form[$jrf]['work_done_by_'.$i] = array(
+	      '#type' => 'select',
+	      '#title' => t('Work Done By'),
+	      '#options' => $user_options,    			
+	      '#default_value' => $work_done,
+	    );
+	
+	    $form[$jrf]['rate_'.$i] = array(
+	      '#type' => 'textfield',
+	      '#title' => t('Rate'),
+	      '#default_value' => '',
+	      '#size' => 20,
+	    );
+	    
+	    $form[$jrf]['count_'.$i] = array(
+	      '#type' => 'textfield',
+	      '#title' => t('Count'),
+	      '#default_value' => '',
+	      '#size' => 20,
+	      
+	    );
+	    $form[$jrf]['note_'.$i] = array(
+	      '#type' => 'textfield',
+	      '#title' => t('Note'),
+	      '#default_value' => '',
+	      '#size' => 20,
+	      '#suffix' => '</div>',
+	    );
+	    
+	    $i++;
+	}
+	    // End of Job Resource Form
+	    
+	   $form[$jrf]['add_more_container_end'] = array(
+	      "#suffix" => "</div>",
+	   );	    
+	    
+	    $form[$jrf]['more_job_resource_form'] = array(
+	      '#prefix' => '<div id="more_job_resource_form">',
+	      '#suffix' => '</div><div class="job_resource_add"><div class="job_resource_link"><span id="add_more_jr" class="add_more_jr">Add More</span></div></div></div>',
+	    );
+	    
+	    $form['group_count'] = array(
+	      '#type' => 'hidden',
+	      '#default_value' => ($i - 1),
+	      '#attributes' => array(
+		  'id' =>  'group_count_id',
+		  'class' => 'group_count_class',
+	       ),
+	    );
+	/**** Job Resource Form End here ***/
+	
+	$dateformat = 'Y-m-d';
+	$default_value = date('Y-m-d');
+	
+	$form['recv_date'] = array(
+	   '#type' => 'date_popup',
+	    '#date_timezone' => date_default_timezone(),
+	    '#date_format' => $dateformat,
+	    '#date_year_range' => '-3:+3',
+	    '#title' => t('Receive Date'),
+	    '#default_value' => $default_value,
+	);
+	
+	$timeinfuture = strtotime("+7 days"); //after 7days
+	$default_value = date('Y-m-d', $timeinfuture);	
+	$form['due_date'] = array(
+	   '#type' => 'date_popup',
+	    '#date_timezone' => date_default_timezone(),
+	    '#date_format' => $dateformat,
+	    '#date_year_range' => '-3:+3',
+	    '#title' => t('Due Date'),
+	    '#default_value' => $default_value,
+	);
+	
+	$form['delivery_date'] = array(
+	   '#type' => 'date_popup',
+	    '#date_timezone' => date_default_timezone(),
+	    '#date_format' => $dateformat,
+	    '#date_year_range' => '-3:+3',
+	    '#title' => t('Delivery Date'),
+	    //'#required' => true,
+	    //'#default_value' => $default_value,
+	);
+	
+	$form['description'] = array(
+	   '#type' => 'textarea',
+           '#title' => t('Description'),
+	   '#default_value' => '',
+	   '#cols' => 30,
+           '#rows' => 5,
+	);
+	
+	
+	
+	$form['job_status'] = array(
+	   '#type' => 'select',
+           '#title' => t('Job Status'),
+	   '#required' => true,
+	   '#prefix' => '<div class="form_field_job_status">',
+	   '#options' => job_status(),
+	   '#default_value' => '',
+	  '#suffix' => "</div>",
+	);
+	
+	$form['submit'] = array (
+	   '#prefix' => '<div id="job_submit">',
+	   '#type' => 'submit',
+	   '#value' => 'Submit',
+	   '#suffix' => '</div>'
+	);
+	
+	return $form;
+    }
+    
+     /***
+    * hook_form_validate
+    ***/
+    function form_jobs_validate($form, &$form_state) {      
+     	$group_counter = $_POST['group_count'];
+     	$flag = 1;
+     	for($i = 0; $i < $group_counter; $i++)
+     	{
+     		if($_POST['work_done_by_'.$i]!="" && $_POST['rate_'.$i]!="" && $_POST['count_'.$i]!="")
+     		{
+     			$flag = 0;
+     			break;
+     			
+     		}
+     		
+     		if($_POST['work_done_by_'.$i]=="" || $_POST['rate_'.$i]=="" || $_POST['count_'.$i]=="")
+     		{
+     			$flag = 1;
+     		}
+     		
+     	}
+     	//echo $flag; exit;	
+     	if($flag == 1)
+     	{
+     		form_set_error('rate_0', t('Please enter at least one job resource'));
+     	}	 
+    }
+    
+     /***
+    * hook_submit
+    ***/
+    function form_jobs_submit($form, &$form_state) {      
+	GLOBAL $user;
+	
+	$job_title = trim($form_state['values']['job_title']);
+	if(empty($job_title) && strtolower($job_title) == 'job title') {
+	  $job_title = 'job-'.$user->name;
+	}	
+	
+	$customer = trim($form_state['values']['customer']);	
+	$project = trim($form_state['values']['project']);
+	$due_date = trim($form_state['values']['due_date']);
+	$recv_date = trim($form_state['values']['recv_date']);
+	
+	$delivery_date = trim($form_state['values']['delivery_date']) != "" ? trim($form_state['values']['delivery_date']) : "" ;
+	$description = trim($form_state['values']['description']);
+	$estimated_word_count = trim($form_state['values']['estimated_word_count']);
+	$job_status = trim($form_state['values']['job_status']);
+	$po_number = trim($form_state['values']['po_number']);	
+	$rate = trim($form_state['values']['rate']);	
+
+	$validators = array('file_validate_extensions' => array());
+	$node = new stdClass();
+
+	//$node = new stdClass();
+	$node->title = $job_title;
+	$node->type = 'job';		
+	$node->language = LANGUAGE_NONE;
+	$node->created = time();
+	$node->log = t('Job created: '.$node->title);
+
+	node_object_prepare($node); //sets up all the default values
+
+	$node->field_date_due['und'][0]['value'] = $due_date;
+	$node->field_project_name['und'][0]['nid'] = $project;
+	$node->field_description['und'][0]['value'] = $description;
+	$node->field_customer['und'][0]['nid']= $customer ;	
+	$node->field_date_received['und'][0]['value'] = $recv_date;
+	$node->field_estimated_word_count['und'][0]['value'] = $estimated_word_count;
+	$node->field_final_word_count['und'][0]['value'] = $estimated_word_count;
+	$node->field_job_status['und'][0]['value'] = $job_status;
+	$node->field_po_number['und'][0]['value'] = $po_number;
+	$node->field_rate['und'][0]['value'] = $rate;
+	
+	if(trim($form_state['values']['delivery_date']) != "")
+		$node->field_delivery_date['und'][0]['value'] = $delivery_date;	
+	
+	node_save($node);
+	$current_node_id = $node->nid;
+	
+	//To change the job node title
+	
+	/*$job_title = 'job-'.$node->nid.'-'.$user->name;
+	$node->title = $job_title;*/
+	if(empty($form_state['values']['job_title'])) {
+	  $job_title = 'job-'.$node->nid.'-'.$user->name;
+	  $node->title = $job_title;
+	  node_save($node);
+	}
+	//End of "To change the job node title"
+	
+	/*********************************************/
+	/* Create Job Resource Node(s) */
+	
+	$i = 0;
+	$group_counter = $_POST['group_count'];
+	while($i <= $group_counter) {
+	  if(!empty($_POST['job_type_'.$i])) {
+	  	if($_POST['work_done_by_'.$i] != "" && $_POST['rate_'.$i]!="" && $_POST['count_'.$i]!="")
+	     {
+	      //$editor_job_resource_title = check_plain($_POST['job_resource_title_'.$i]);
+	      $editor_job_resource_title = 'job-resource-'.$current_node_id.'-'.$user->name.'-'.$i;
+	      $job_type = check_plain($_POST['job_type_'.$i]);
+	      $work_done_by = check_plain($_POST['work_done_by_'.$i]);
+	      $note = check_plain($_POST['note_'.$i]);
+	      $rate = check_plain($_POST['rate_'.$i]);
+	      if($rate == "")
+		$rate = 0;	
+	      $count = check_plain($_POST['count_'.$i]);
+	      if($count == "")
+		$count = 0;	
+
+	      $node = new stdClass();
+	      $node->title = $editor_job_resource_title;		
+	      $node->type = 'job_resource';		
+	      $node->language = LANGUAGE_NONE;
+	      $node->created = time();
+	      $node->log = t('Job resource created: '.$node->title);
+      
+	      node_object_prepare($node); //sets up all the default values
+	      
+	      $node->field_job_type['und'][0]['tid'] = $job_type;
+	      $node->field_member['und'][0]['uid'] = $work_done_by;
+	      $node->field_job_assigned['und'][0]['nid'] = $current_node_id;
+	      $node->field_rate['und'][0]['value'] = $rate;
+	      $node->field_count['und'][0]['value'] = $count;
+	      $node->field_job_resource_note['und'][0]['value'] = $note;
+	      
+	      node_save($node);
+	    }  
+	  }
+	  
+	  $i++;
+	}	
+	/*********************************************/
+	
+	//structure the notification message		  
+	$output = t("A new job @name has been added successfully.", array(
+	'@name' => $job_title,		      
+	)
+	);
+	 
+	drupal_set_message($output);
+	
+	drupal_goto('user-dashboard');
+    }
+
+
+    function create_job_edit($form, &$form_state, $jid) {
+	unset($_SESSION['resource_title']);
+	GLOBAL $user;
+	$uid = $user->uid;
+	$user_name = $user->name;
+      
+	ctools_include('modal');
+	ctools_include('ajax');
+	ctools_modal_add_js();
+      
+	$job_array = node_load($jid);
+	
+	//prepare customer dropdown
+	$result_customer = db_select('node', 'n')
+	  ->fields('n', array('nid','title'))
+	  ->condition('type', 'customer','=')
+	  ->execute();
+
+	$cust_options=array();
+	
+	while($arr_customer = $result_customer->fetchAssoc()){
+	  $cust_options[$arr_customer['nid']] = $arr_customer['title'];
+	}
+
+	//prepare project dropdown
+	$result_project = db_select('node', 'n')
+	  ->fields('n', array('nid','title'))
+	  ->condition('type', 'project','=')
+	  ->execute();
+
+        $proj_options=array();
+	
+	while($arr_project = $result_project->fetchAssoc()){	
+	  $proj_options[$arr_project['nid']] = $arr_project['title'];
+	}
+	
+	//prepare user dropdown with project manager role(rid=7)
+	$query_users_pm = db_select('users', 'u');
+	$query_users_pm->join('users_roles', 'ur', 'u.uid = ur.uid');
+	$query_users_pm->fields('u', array('uid','name'))
+			->condition('ur.rid',7,'=');
+	$result_users_pm = $query_users_pm->execute();
+
+	$user_pm_options=array();
+	
+	while($arr_users_pm = $result_users_pm->fetchAssoc()){	
+	  $user_pm_options[$arr_users_pm['uid']] = $arr_users_pm['name'];
+	}
+
+	//prepare user dropdown with translator role(rid=9)
+	$query_users_tr = db_select('users', 'u');
+	$query_users_tr->join('users_roles', 'ur', 'u.uid = ur.uid');
+	$query_users_tr->fields('u', array('uid','name'))
+			   ->condition('ur.rid',9,'=');
+	$result_users_tr = $query_users_tr->execute();
+
+	$user_tr_options=array();
+	
+	while($arr_users_tr = $result_users_tr->fetchAssoc()){	
+	  $user_tr_options[$arr_users_tr['uid']] = $arr_users_tr['name'];
+	}
+
+        $form = array();
+	$form['#attributes'] = array('enctype' => "multipart/form-data");
+	
+	$form['job_title'] = array(
+	  '#type' => 'textfield',
+	  '#title' => t('Job Name'),
+	  '#default_value' => $job_array->title,
+	  '#size' => 20,
+	);
+	
+	$form['customer'] = array(
+	   '#type' => 'select',
+           '#title' => t('Customer'),
+	   '#required' => true,
+	   '#options' => $cust_options,
+	   '#default_value' => $job_array->field_customer['und'][0]['nid'],
+	   '#prefix' => '<div class="form_field_customer">',
+	   '#suffix' => "<div class='resource_link'>".ctools_modal_text_button(t('Add Customer'), 'add_customer_ajax', t('Add Customer'), 'ctools-modal-my-modal-style')."</div></div>",
+	);
+	
+	$form['project'] = array(
+	   '#type' => 'select',
+           '#title' => t('Project'),
+	   '#required' => true,
+	   '#options' => $proj_options,
+	   '#default_value' =>  $job_array->field_project_name['und'][0]['nid'],
+	   '#prefix' => '<div class="form_field_project">',
+	   '#suffix' => "<div class='resource_link'>".ctools_modal_text_button(t('Add Project'), 'add_project_ajax', t('Add Project'), 'ctools-modal-my-modal-style')."</div></div>",
+	);
+	
+	$form['final_word_count'] = array(
+	  '#type' => 'textfield',
+	  '#title' => t('Final Word Count'),
+	  '#default_value' => $job_array->field_final_word_count['und'][0]['value'],
+	  '#size' => 20,
+	);
+	
+	$form['rate'] = array(
+	  '#type' => 'textfield',
+	  '#title' => t('Rate'),
+	  '#default_value' => $job_array->field_rate['und'][0]['value'],
+	  '#size' => 20,
+	);
+
+	$form['po_number'] = array(
+	  '#type' => 'textfield',
+	  '#title' => t('PO/Customer Number'),
+	  '#default_value' => $job_array->field_po_number['und'][0]['value'],
+	  '#size' => 20,
+	);	
+	
+	/**** Job Resource Form start here ***/	
+	//prepare user dropdown	
+	/*$users = entity_load('user');
+	$user_options=array();
+	$user_options[''] = '';
+	foreach($users as $key => $val){
+	  foreach($val->roles AS $key2=>$val2){
+	    if($key2==13){
+	      $user_options[$val->uid] = $val->name;
+	    }
+	  }
+	}*/
+	
+	$user_options = all_users();
+	
+	$result_term = db_select('taxonomy_term_data', 'n')
+		    ->fields('n', array('tid','name'))
+		    ->condition('vid', '4','=')
+		    ->execute();
+	
+	$term_options=array();    
+	while($arr_term = $result_term->fetchAssoc()){
+	  $term_options[$arr_term['tid']] = $arr_term['name'];
+	}
+	
+	$query = "SELECT node.created AS node_created, node.nid AS nid
+		  FROM 
+		  {node} node
+		  LEFT JOIN {field_data_field_job_assigned} field_data_field_job_assigned ON node.nid = field_data_field_job_assigned.entity_id AND (field_data_field_job_assigned.entity_type = 'node' AND field_data_field_job_assigned.deleted = '0')
+		  WHERE (( (node.status = '1') AND (node.type IN  ('job_resource')) AND (field_data_field_job_assigned.field_job_assigned_nid IN  ('$jid')) ))
+		  ORDER BY node_created DESC";
+	$result = returnArrayOfObject($query);
+	
+	$jrf = 'job_resource_form';
+	$form[$jrf] = array(
+	  '#type' => 'fieldset',
+	  '#title' => t('Job Resource'),
+	  '#collapsible' => TRUE,
+	  '#collapsed' => FALSE,
+	  '#prefix' => '<div class="job_resource_cont">',
+	);	
+	
+	$form[$jrf]['add_more_container_start'] = array(
+	      '#prefix' => '<div id="add_more_container_div">',
+	);	
+	
+	$result_counter = count($result);
+	if($result_counter > 0){
+	  foreach($result AS $i => $job_resource) {
+	    $nid_jr = $job_resource->nid;
+	    $node_jr = node_load($nid_jr);
+	    
+	    $job_type = $node_jr->field_job_type['und'][0]['tid'];
+	    $work_done_by = $node_jr->field_member['und'][0]['uid'];
+	    $rate = $node_jr->field_rate['und'][0]['value'];
+	    $count = $node_jr->field_count['und'][0]['value'];
+	    $note = $node_jr->field_job_resource_note['und'][0]['value'];
+	    if($i == 0) {
+	      $extra_class = 'first_container';
+	    } else if($i == ($result_counter - 1)) {      
+	      $extra_class = 'inner_container';
+	    } else {
+	      $extra_class = 'inner_container';
+	    }
+	    
+	    $form[$jrf]['job_type_'.$i] = array(
+	      '#type' => 'select',
+	      '#title' => t('Job Type'),
+	      '#required' => true,
+	      '#options' => $term_options,
+	      '#default_value' => $job_type,
+	      '#prefix' => '<div class="job_resource_container '.$extra_class.'">',
+	    );
+	    
+	    $form[$jrf]['work_done_by_'.$i] = array(
+	      '#type' => 'select',
+	      '#title' => t('Work Done By'),
+	      '#options' => $user_options,
+	      '#default_value' => $work_done_by,
+	    );
+	
+	    $form[$jrf]['rate_'.$i] = array(
+	      '#type' => 'textfield',
+	      '#title' => t('Rate'),
+	      '#default_value' => $rate,
+	      '#size' => 20,
+	    );	    
+	    
+	    $form[$jrf]['job_resource_nid_'.$i] = array(
+	      '#type' => 'hidden',
+	      '#default_value' => $nid_jr,
+	    );
+	    
+	    $form[$jrf]['count_'.$i] = array(
+	     '#type' => 'textfield',
+	     '#title' => t('Count'),
+	     '#default_value' => $count,
+	     '#size' => 20,
+	     
+	    );
+	    
+	    $form[$jrf]['note_'.$i] = array(
+	      '#type' => 'textfield',
+	      '#title' => t('Note'),
+	      '#default_value' => $note,
+	      '#size' => 20,
+	      '#suffix' => '</div>',
+	    );
+	    // End of Job Resource Form
+	  }
+	  
+	}
+	
+	$form[$jrf]['add_more_container_end'] = array(
+	      "#suffix" => "</div>",
+	);
+	
+	$form[$jrf]['more_job_resource_form'] = array(
+	  '#prefix' => '</div><div class="job_resource_add"><div class="job_resource_link"><spam id="add_more_jr" class="add_more_jr">Add More</spam></div></div><div id="more_job_resource_form">',
+	  '#suffix' => '</div>',
+	);
+	
+	$form['group_count'] = array(
+	  '#type' => 'hidden',
+	  '#default_value' => $i+1,
+	  '#attributes' => array(
+	      'id' =>  'group_count_id',
+	      'class' => 'group_count_class',
+	   ),
+    	);
+	/**** Job Resource Form End here ***/
+	
+	$jr_views = '<div class="job_resource_view">'.views_embed_view('job_resources','block_1', $jid).'</div>';
+	
+	$dateformat = 'Y-m-d';	
+	$form['recv_date'] = array(
+	   '#type' => 'date_popup',
+	    '#date_timezone' => date_default_timezone(),
+	    '#date_format' => $dateformat,
+	    '#date_year_range' => '-3:+3',
+	    '#title' => t('Receive Date'),
+	    '#default_value' => $job_array->field_date_received['und'][0]['value'],
+	    '#prefix' => $jr_views,
+	);
+	
+	$form['due_date'] = array(
+	   '#type' => 'date_popup',
+	    '#date_timezone' => date_default_timezone(),
+	    '#date_format' => $dateformat,
+	    '#date_year_range' => '-3:+3',
+	    '#title' => t('Due Date'),
+	    '#default_value' => $job_array->field_date_due['und'][0]['value'],
+	);
+	
+	$form['delivery_date'] = array(
+	   '#type' => 'date_popup',
+	    '#date_timezone' => date_default_timezone(),
+	    '#date_format' => $dateformat,
+	    '#date_year_range' => '-3:+3',
+	    '#title' => t('Delivery Date'),
+	    //'#required' => true,
+	    '#default_value' => $job_array->field_delivery_date['und'][0]['value'],
+	);
+	
+	$form['description'] = array(
+	   '#type' => 'textarea',
+           '#title' => t('Description'),
+	   '#default_value' => $job_array->field_description['und'][0]['value'],
+	   '#cols' => 30,
+           '#rows' => 5,
+	   
+	);
+	
+	$form['jid'] = array(
+	  '#type' => 'hidden',
+	  '#title' => t('Customer Id'),
+	  '#default_value' => $jid,
+	  '#size' => 40,
+	);
+	
+		
+	
+	$form['job_status'] = array(
+	   '#type' => 'select',
+           '#title' => t('Job Status'),
+	   '#required' => true,
+	   '#prefix' => '<div class="form_field_job_status">',
+	   '#options' => job_status(),
+	   '#default_value' => '',
+	  '#suffix' => "</div>",
+	);
+	
+	$form['submit'] = array (
+	   '#prefix' => '<div id="job_submit">',
+	   '#type' => 'submit',
+	   '#value' => 'Submit',
+	   '#suffix' => '</div>'
+	);
+	
+	return $form;
+    }
+    
+     /***
+    * hook_form_validate
+    ***/
+    function create_job_edit_validate($form, &$form_state) {
+      	$group_counter = $_POST['group_count'];
+     	$flag = 1;
+     	for($i = 0; $i < $group_counter; $i++)
+     	{
+     		if($_POST['work_done_by_'.$i]!="" && $_POST['rate_'.$i]!="" && $_POST['count_'.$i]!="")
+     		{
+     			$flag = 0;
+     			break;
+     			
+     		}
+     		
+     		if($_POST['work_done_by_'.$i]=="" || $_POST['rate_'.$i]=="" || $_POST['count_'.$i]=="")
+     		{
+     			$flag = 1;
+     		}
+     		
+     	}
+     	//echo $flag; exit;	
+     	if($flag == 1)
+     	{
+     		form_set_error('rate_0', t('Please enter at least one job resource'));
+     	}	 
+    }
+
+    function create_job_edit_submit($form, &$form_state) {
+	GLOBAL $user;
+	
+	//load the existing node
+	$node = node_load($form_state['values']['jid']);
+	$job_title = trim($form_state['values']['job_title']);
+	$customer = trim($form_state['values']['customer']);	
+	$project = trim($form_state['values']['project']);
+	$due_date = trim($form_state['values']['due_date']);
+	$recv_date = trim($form_state['values']['recv_date']);
+	$delivery_date = trim($form_state['values']['delivery_date']) != "" ? trim($form_state['values']['delivery_date']) : "";
+	$description = trim($form_state['values']['description']);
+	$final_word_count = trim($form_state['values']['final_word_count']);
+	$job_status = trim($form_state['values']['job_status']);
+	$po_number = trim($form_state['values']['po_number']);
+	$rate = trim($form_state['values']['rate']);
+
+	$node->title = $job_title;
+	$node->type = 'job';		
+	$node->language = LANGUAGE_NONE;
+	$node->created = time();
+	$node->log = t('Job edited: '.$node->title);
+
+	$node->field_date_due['und'][0]['value'] = $due_date;
+	$node->field_project_name['und'][0]['nid'] = $project;
+	$node->field_description['und'][0]['value'] = $description;
+	$node->field_customer['und'][0]['nid']= $customer;
+	$node->field_date_received['und'][0]['value'] = $recv_date;
+	$node->field_job_status['und'][0]['value'] = $job_status;
+	$node->field_final_word_count['und'][0]['value'] = $final_word_count;
+	$node->field_po_number['und'][0]['value'] = $po_number;
+	$node->field_rate['und'][0]['value'] = $rate;
+	
+	if(trim($form_state['values']['delivery_date']) != "")
+		$node->field_delivery_date['und'][0]['value'] = $delivery_date;	
+	
+	node_save($node);
+	
+	//To change the job node title
+	
+	/*$job_title = 'job-'.$node->nid.'-'.$user->name;
+	$node->title = $job_title;*/
+	if(empty($job_title)){
+	  $job_title = 'job-'.$node->nid.'-'.$user->name;
+	  $node->title = $job_title;
+	  node_save($node);
+	}
+	$current_node_id = $node->nid;
+	//End of "To change the job node title"
+	
+	
+	/*********************************************/
+	/* Create Job Resource Node(s) */
+	
+	$i = 0;
+	$group_counter = $_POST['group_count'];
+	while($i <= $group_counter) {
+	  if(!empty($_POST['job_type_'.$i])) {
+	  	
+	    if($_POST['work_done_by_'.$i] != "" && $_POST['rate_'.$i]!="" && $_POST['count_'.$i]!="") {
+	      $job_resource_nid = check_plain($_POST['job_resource_nid_'.$i]);
+	      $job_type = check_plain($_POST['job_type_'.$i]);
+	      $work_done_by = check_plain($_POST['work_done_by_'.$i]);
+	      $rate = check_plain($_POST['rate_'.$i]);
+	      $count = check_plain($_POST['count_'.$i]);
+	      $note = check_plain($_POST['note_'.$i]);
+	      
+	      if(!empty($job_resource_nid)) {
+		$node = node_load($job_resource_nid);
+		
+	      } else {
+		$editor_job_resource_title = 'job-resource-'.$current_node_id.'-'.$user->name.'-'.$i;
+		
+		$node = new stdClass();
+		$node->title = $editor_job_resource_title;		
+		$node->type = 'job_resource';
+		$node->language = LANGUAGE_NONE;
+		$node->created = time();
+		$node->log = t('Job resource created: '.$node->title);
+	
+		node_object_prepare($node); //sets up all the default values
+	      }
+	      
+	      $node->field_job_type['und'][0]['tid'] = $job_type;
+	      $node->field_member['und'][0]['uid'] = $work_done_by;
+	      $node->field_job_assigned['und'][0]['nid'] = $current_node_id;
+	      $node->field_rate['und'][0]['value'] = $rate;
+	      $node->field_count['und'][0]['value'] = $count;
+	      $node->field_job_resource_note['und'][0]['value'] = $note;
+	      
+	      node_save($node);
+	   }   
+	  }
+	  
+	  $i++;
+	}	
+	/*********************************************/
+	
+	//structure the notification message		  
+	$output = t("The job @name has been updated successfully.", array(
+	  '@name' => $job_title,		      
+	  )
+	);
+	
+	drupal_set_message($output);
+	drupal_goto('user-dashboard');
+    }
+    
+    
+  /***************** 	Job Status  *******************/
+  function job_status(){
+    return $options = array(
+      1 => 'Translating',
+      2 => 'Editing', 
+      3 => 'pending',
+      4 => 'Completed',
+      5 => 'Invoiced',
+      6 => 'Payment Received',
+      7 => 'Closed'
+    );
+  }
+
+
+  function all_users() {
+    $options = array();
+    $query = "SELECT users.name AS users_name, users.uid AS uid, users.created AS users_created
+	    FROM 
+	    {users} users
+	    WHERE (( (users.status <> '0') ))
+	    ORDER BY users_created DESC";
+    $result = returnArrayOfObject($query);
+    foreach($result AS $data) {
+      $options[$data->uid] = $data->users_name;
+    }
+    
+    return $options;
+  }

@@ -1,0 +1,8 @@
+Line number 595
+
+    if (!empty($nodes)) { //Added this condition
+        if (node_access_needs_rebuild() || $reset) {
+          $nodes = array();
+          return;
+        }
+    }

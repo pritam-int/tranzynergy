@@ -1,0 +1,154 @@
+<?php
+
+/**
+  ** Implementation of hook_permission().
+  **/
+  function delete_job_permission() {
+    // Restrict access to either of your new URLs.
+    return array(
+      'access delete job functionality' => array(
+	'title' => t('access user dashboard delete job functionality'),
+	'description' => t('Allow users to access user dashboard delete job functionality'),
+      ),
+    );
+  }
+
+/***
+  * hook_menu
+  ***/
+  function delete_job_menu() {
+    $items = array();
+    
+    $items['delete_job_confirm'] = array(		
+	'title' => 'Confirm Delete Jobs',
+	'page callback' => 'delete_job_confirm',
+	'access arguments' => array('access delete job functionality'),
+	'access callback' => 'user_access',
+	'type' => MENU_CALLBACK,
+    );
+    
+    $items['delete_job'] = array(		
+	'title' => 'Delete Jobs',
+	'page callback' => 'delete_job',
+	'access arguments' => array('access delete job functionality'),
+	'access callback' => 'user_access',
+	'type' => MENU_CALLBACK,
+    );
+    
+    return $items;
+  }
+  
+function delete_job_confirm(){
+  
+  $job_nids =  array();
+    if(!empty($_POST['job_nids_delete'])) {
+      $_SESSION['job_nids_delete'] = trim(check_plain($_POST['job_nids_delete']));
+    }
+  
+    if(!empty($_POST['job_nids_delete'])) {
+      $job_nids_posted = trim(check_plain($_POST['job_nids_delete']));
+    } else if (!empty($_SESSION['job_nids_delete'])) {
+      $job_nids_posted = $_SESSION['job_nids_delete'];
+    } else {
+      drupal_set_message('Please select atleast one Job', 'error');
+
+      drupal_goto('user-dashboard');
+    }
+    $pos = strpos($job_nids_posted, ',');
+
+    if ($pos == true) {
+      $job_nids = explode(',', $job_nids_posted);
+    } else {
+      $job_nids[0] = $job_nids_posted;
+    }
+    
+  $job_titles = '';  
+  
+    foreach($job_nids AS $jnid) {
+	$job_details = node_load($jnid);
+	$job_title = $job_details->title;
+	
+	$job_titles .=  "<li>".$job_title."</li>";
+	
+    }
+    
+    $confirmation_form = '<div class="confirm_top">
+			    Are you sure you want to delete the following selected Jobs and all of the related Resources ?
+			    <div class="job_titles"><ul>'.$job_titles.'</ul></div>
+			    <div class="confirm_yes" id="confirm_yes">'.l("Delete","delete_job").'</div>
+			    <div class="confirm_cancel" id="confirm_cancel">'.l("Cancel","node/132").'</div>
+			  </div>';
+    return $confirmation_form;
+		
+}
+  
+  
+function delete_job(){
+  
+    $job_nids =  array();
+    
+    if(!empty($_POST['job_nids_delete'])) {
+      $job_nids_posted = trim(check_plain($_POST['job_nids_delete']));
+    } else if (!empty($_SESSION['job_nids_delete'])) {
+      $job_nids_posted = $_SESSION['job_nids_delete'];
+    } else {
+      drupal_set_message('Please select atleast one Job', 'error');
+
+      drupal_goto('user-dashboard');
+    }
+    $pos = strpos($job_nids_posted, ',');
+
+    if ($pos == true) {
+      $job_nids = explode(',', $job_nids_posted);
+    } else {
+      $job_nids[0] = $job_nids_posted;
+    }
+  //echo "<pre>";
+  //print_r($job_nids);
+  //exit();
+  $job_titles = '';  
+  
+    foreach($job_nids AS $jnid) {
+	$job_details = node_load($jnid);
+	$job_title = $job_details->title;
+      
+	/* Job Resource */
+	$query_jr = "SELECT node.title AS node_title, node.nid AS nid
+		      FROM
+		      {node} node
+		      LEFT JOIN {field_data_field_job_assigned} field_data_field_job_assigned ON node.nid = field_data_field_job_assigned.entity_id AND (field_data_field_job_assigned.entity_type = 'node' AND field_data_field_job_assigned.deleted = '0')
+		      WHERE (( (node.status = '1') AND (node.type IN  ('job_resource')) AND (field_data_field_job_assigned.field_job_assigned_nid IN  ('$jnid')) ))
+		      ORDER BY node_title ASC";
+	$result_jr = returnArrayOfObject($query_jr);
+	foreach($result_jr AS $jr) {
+	  $jr_nid = $jr->nid; // Job Resource Nid
+	  node_delete($jr_nid);
+	  //echo 'jr_nid : '.$jr_nid."<br>";
+	}
+	node_delete($jnid);
+	if(empty($job_titles)) {
+	  $job_titles .=  $job_title;
+	} else {
+	  $job_titles .=  ', '.$job_title;  
+	}
+	
+    }
+    if(isset($_SESSION['job_nids_delete'])){
+      unset($_SESSION['job_nids_delete']);
+    }
+    drupal_set_message('The selected Jobs '.$job_titles.' and all of the related Resources has been deleted');
+    drupal_goto('user-dashboard');    
+
+}
+
+
+
+
+
+
+
+
+
+
+
+

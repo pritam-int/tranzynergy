@@ -1,0 +1,113 @@
+<?php
+
+    /***
+    * hook_menu
+    ***/
+    function import_customers_menu() {        
+      $items = array();            
+      $items['import_customers'] = array(		
+	  'title' => 'Import Customers',
+	  'page callback' => 'drupal_get_form',
+	  'page arguments' => array('import_customers_from_excel'),
+	  'access arguments' => array('access import customers'),
+	  'access callback' => 'user_access',
+	  'type' => MENU_NORMAL_ITEM,
+      );
+      
+      return $items;
+    }
+    
+    /**	* Implementation of hook_permission().
+	*/
+    function import_customers_permission() {
+      // Restrict access to either of your new URLs.
+      return array(
+	'access import customers' => array(
+	  'title' => t('access Import Customers'),
+	  'description' => t('Allow users to access Import Customers functionality'),
+	),
+      );
+    }
+    
+    /***
+    * function to create add job form
+    ***/
+    function import_customers_from_excel() {
+      $form = array();
+      $form['#attributes'] = array('enctype' => "multipart/form-data");
+      
+      $form['excel_file'] = array(
+	  '#type' => 'file',
+	  '#title' => t('Upload Excelsheet'),
+	  '#default_value' => '',
+	  '#size' => 30,
+      );
+      
+      $form['submit'] = array (
+	'#prefix' => '<div id="import_customers_submit">',
+	'#type' => 'submit',
+	'#value' => 'Submit',
+	'#suffix' => '</div>'
+     );
+   
+      return $form;
+    }
+    
+     /***
+    * hook_form_validate
+    ***/
+    function import_customers_from_excel_validate($form, &$form_state) {
+      //you do your validation here
+    }
+    
+     /***
+    * hook_submit
+    ***/
+    function import_customers_from_excel_submit($form, &$form_state) {
+      GLOBAL $user;
+      $uid = $user->uid;
+      $user_name = $user->name;
+      $customer_names = array();      
+      $validators = array('file_validate_extensions' => array());
+      $file_doc = file_save_upload('excel_file', $validators, "public://excel_files/");
+      $inputFileName = drupal_realpath($file_doc->uri);
+    
+      /************* Read Excel File for customers details ************/      
+      /** PHPExcel_IOFactory */
+      $path_val = drupal_get_path('module', 'import_customers').'/Classes/PHPExcel/IOFactory.php';
+      include($path_val);
+      
+      $inputFileType = PHPExcel_IOFactory::identify($inputFileName);
+      $objReader = PHPExcel_IOFactory::createReader($inputFileType);
+      $objPHPExcel = $objReader->load($inputFileName);
+      
+      $sheetData = $objPHPExcel->getActiveSheet()->toArray(null,true,true,true);
+      $output = array_slice($sheetData, 1);
+      foreach($output as $value){
+	  foreach($value as $customer_name){
+	      $title_val = check_plain(trim($customer_name));
+	      
+	      if(!empty($title_val)) {
+		$node = new stdClass();
+		$node->title = check_plain($customer_name);
+		$node->type = 'customer';
+		$node->uid = $uid;
+		$node->language = LANGUAGE_NONE;
+		$node->created = time();
+		$node->log = t('Job created: '.$user_name);
+		
+		node_save($node);
+	      }
+	      
+	  }
+      }     
+      /************* End of Read Excel File for customers details ************/
+	
+	//structure the notification message		  
+	$output = t("All the following new customers has been added successfully : @customers ", array(
+	    '@customers' => $customer_names,		      
+	  )
+	);
+      drupal_goto('customers-list');
+  }
+  

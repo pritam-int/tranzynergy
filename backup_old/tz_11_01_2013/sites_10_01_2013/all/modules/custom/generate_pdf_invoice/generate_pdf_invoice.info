@@ -1,0 +1,6 @@
+; $Id$
+name = Generate PDF Invoice
+description = This module has been created to Generate PDF Invoice
+core = 7.x
+package = Custom Module
+version = 7.0.1
